@@ -99,12 +99,12 @@ function handleMessage(event) {
     const pos = deviceToScreen(msg.x, msg.y);
 
     if (msg.action === "down") {
-      // Finger went down → add to fingers map
+      // finger down -> add to fingers map
       let c  = GESTURE_COLORS[msg.gesture] || DEFAULT_COLOR;
-      fingers[fid] = { pos.x, pos.y, color: c };
+      fingers[fid] = { x: pos.x, y: pos.y, color: c };
     }
     else if (msg.action === "move") {
-      // Finger moved → update its x,y, color (if needed)
+      // finger move -> update its x,y, color (if needed)
       if (fingers[fid]) {
         let c  = GESTURE_COLORS[msg.gesture] || DEFAULT_COLOR;
         fingers[fid].x     = pos.x;
@@ -113,58 +113,38 @@ function handleMessage(event) {
       }
     }
     else if (msg.action === "up") {
-      // finger lifted-> remove from map
+      // finger up -> remove from map
       delete fingers[fid];
     }
   }
 }
 
 function draw() {
-  // 1) If the dotMatrix changed, re‐draw it into bgLayer
+  // if the dotMatrix changed, re‐draw it into bgLayer
   if (redraw) {
     bgLayer.background(0);
     for (let i = 0; i < ROWS; i++) {
       for (let j = 0; j < COLS; j++) {
-        let x = j * cellWidth + PADDING/2;
-        let y = i * cellHeight + PADDING/2;
-        bgLayer.fill(dotMatrix[i][j] ? 255 : 68);
         if (j % 3 !== 2 && i % 5 !== 4) {
+          const x = (PAD / 2) + (j * cellWidth) + (cellWidth / 2);
+          const y = (PAD / 2) + (i * cellHeight) + (cellHeight / 2);
+          bgLayer.fill(dotMatrix[i][j] ? 255 : 68);
           bgLayer.ellipse(
-            x + cellWidth/2,
-            y + cellHeight/2,
+            x,
+            y,
             cellWidth * 0.56,
             cellHeight * 0.56
           );
         }
       }
     }
-    bgNeedsRedraw = false;
+    redraw = false;
   }
 
-  // 2) Blit that cached background (erasing any old circles)
+  // blit the cached background (erasing any old circles)
   image(bgLayer, 0, 0);
 
-  // 3) Draw double‐tap highlights (this part is as before)
-  noStroke();
-  for (let i = doubleTaps.length - 1; i >= 0; i--) {
-    let dt = doubleTaps[i];
-    let x = dt.x_idx * cellWidth + PADDING/2;
-    let y = dt.y_idx * cellHeight + PADDING/2;
-    let alpha = map(dt.life, 0, 300, 0, 200);
-    fill(0, 210, 255, alpha);
-    ellipse(
-      x + cellWidth/2,
-      y + cellHeight/2,
-      cellWidth * 0.56,
-      cellHeight * 0.56
-    );
-    dt.life -= 3;
-    if (dt.life <= 0) {
-      doubleTaps.splice(i, 1);
-    }
-  }
-
-  // 4) Finally, draw circles for any "down" fingers that remain in the map
+  // draw circles for any "down" fingers that remain in the map
   noStroke();
   for (let fid in fingers) {
     let f = fingers[fid];
