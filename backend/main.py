@@ -11,19 +11,23 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
 from serial_read import SerialHandler
+from debug_tools import *
 
 BASE_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FRONTEND_PATH = os.path.join(BASE_PATH, 'frontend')
 
 # serial connection
-ser = SerialHandler()
+ser: SerialHandler | None = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("App starting up...")
-    yield
-    print("App shutting down...")
-    ser.close()
+    global ser
+    ser = SerialHandler()
+    try:
+        yield
+    finally:
+        ser.close()
+
 
 app = FastAPI(lifespan=lifespan)
 
@@ -67,10 +71,11 @@ async def websocket_endpoint(websocket: WebSocket):
                     print("Removing stale client...")
                     clients.remove(client)
 
-    except WebSocketDisconnect:
-        print("Client disconnected")
+    except (WebSocketDisconnect, asyncio.CancelledError) as e:
+        print(f"Client disconnected with {e}")
         if websocket in clients:
             clients.remove(websocket)
+        await websocket.close(code=1001)
 
 
 if __name__ == "__main__":

@@ -7,7 +7,7 @@ import queue
 from gestures import GestureDetector
 from serial_helper import *
 
-SERIAL_PORT = 'COM7'
+SERIAL_PORT = 'COM5'
 BAUDRATE = 115200
 
 
@@ -186,7 +186,12 @@ class SerialHandler:
         Stop the thread and close the serial port.
         """
         self.running = False
+        if self.ser.is_open:
+            try:
+                self.ser.cancel_read()
+            except AttributeError:
+                self.ser.close()
         if self.read_thread.is_alive():
-            self.read_thread.join(timeout=1.0)
+            self.read_thread.join()
         if self.ser.is_open:
             self.ser.close()
