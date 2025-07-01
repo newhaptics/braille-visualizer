@@ -90,7 +90,7 @@ function handleMessage(event) {
   const msg = JSON.parse(event.data);
 
   if (msg.type === "matrix") {
-    // Received a new 20×96 array → update and mark bgLayer dirty
+    // new 20x96 array → update and mark bgLayer dirty
     dotMatrix = msg.mat;
     redraw = true;
   }
@@ -152,8 +152,8 @@ function draw() {
     ellipse(
       f.x + cellWidth/2,
       f.y + cellHeight/2,
-      40,
-      40
+      scale * 40,
+      scale * 40
     );
   }
 }
