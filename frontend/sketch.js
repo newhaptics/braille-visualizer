@@ -144,7 +144,7 @@ function draw() {
   // blit the cached background (erasing any old circles)
   image(bgLayer, 0, 0);
 
-  // draw circles for any "down" fingers that remain in the map
+  // draw circles for any fingers that are down
   noStroke();
   for (let fid in fingers) {
     let f = fingers[fid];
