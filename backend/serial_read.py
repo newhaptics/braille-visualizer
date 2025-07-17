@@ -7,7 +7,7 @@ import queue
 from gestures import GestureDetector
 from serial_helper import *
 
-SERIAL_PORT = 'COM5'
+SERIAL_PORT = 'COM8'
 BAUDRATE = 115200
 
 
@@ -110,7 +110,7 @@ class SerialHandler:
                 y = int.from_bytes(y_bytes, byteorder='little', signed=False)
                 fid = fid_byte[0]
 
-                # If it's MOVE, you might run gesture detection
+                # If it's MOVE, run gesture detection
                 if ptype == EVENT_MOVE:
                     gesture = self.gesture_detector.update(fid, x, y)
                 else:
@@ -174,11 +174,21 @@ class SerialHandler:
                     continue
 
                 with self.lock:
-                    self.matrix = mat.tolist()  # or keep as numpy array if you prefer
+                    # add row of zeros to the top -> shape becomes (21, 96)
+                    mat = np.vstack([np.zeros((1, mat.shape[1]), dtype=mat.dtype), mat])
+
+                    # remove the last column -> shape becomes (21, 95)
+                    mat = mat[:, :-1]
+
+                    # add a column of zeros to the front -> shape becomes (21, 96)
+                    mat = np.hstack([np.zeros((mat.shape[0], 1), dtype=mat.dtype), mat])
+
+                    self.matrix = mat.tolist()
+
                 self.events.put({'type': 'matrix', 'mat': self.matrix})
 
             else:
-                # Unknown type; skip
+                # unknown type -> skip
                 print(f"[SerialHandler] Unknown packet type: 0x{ptype:02X}")
 
     def close(self):

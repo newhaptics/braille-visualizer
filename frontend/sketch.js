@@ -2,18 +2,18 @@
 // Resize-aware CodeX visualizer
 
 // ---------- logical dimensions of the device ----------
-const TS_WIDTH = 1600;   // touchscreen width
-const TS_HEIGHT = 350;   // touchscreen height
-const ROWS = 20;
+const TS_WIDTH = 1601;   // touchscreen width (0 -> 1600)
+const TS_HEIGHT = 351;   // touchscreen height (0 -> 350)
+const ROWS = 21;
 const COLS = 96;
-const PAD  = 50;         // physical padding around grid (kept in screen px)
+const PAD  = 0;         // physical padding around grid (kept in screen px)
 
 // ---------- globals that change when the window is resized ----------
-let scale;                // (uniform in X & Y)
+let scale;                         // (uniform in X & Y)
 let cellWidth, cellHeight;         // size of one braille dot “cell” on‑screen
 let canvasWidth, canvasHeight;     // actual p5 canvas size (includes PAD)
-let bgLayer;              // cached grid layer
-redraw = true; // becomes true on dot‑matrix or size change
+let bgLayer;                       // cached grid layer
+redraw = true;                     // becomes true on dot‑matrix or size change
 
 let dotMatrix      = [];    // 20x96 array, updated on "matrix" messages
 let fingers        = {};    // map: fingerID -> { x, y, color }
@@ -24,9 +24,9 @@ let GESTURE_COLORS;
 let socket = new WebSocket(WS_HOST);
 
 function setup() {
-  createCanvas(1, 1);            // immediately resize in updateLayout()
-  pixelDensity(1);               // avoids blurriness on high‑DPI screens
-  updateLayout();                // compute scale & resize everything
+  createCanvas();   // immediately resize in updateLayout()
+  pixelDensity(1);  // avoids blurriness on high‑DPI screens
+  updateLayout();   // compute scale & resize everything
 
   // offscreen buffer
   bgLayer = createGraphics(canvasWidth, canvasHeight);
@@ -63,8 +63,8 @@ function updateLayout() {
     scale = Math.min(maxWidth / TS_WIDTH, maxHeight / TS_HEIGHT);
 
     // calculate on-screen size
-    canvasWidth = Math.round(TS_WIDTH * scale + PAD);
-    canvasHeight = Math.round(TS_HEIGHT * scale + PAD);
+    canvasWidth  = TS_WIDTH  * scale + PAD;
+    canvasHeight = TS_HEIGHT * scale + PAD;
 
     // resize canvas
     resizeCanvas(canvasWidth, canvasHeight, true);
@@ -73,7 +73,7 @@ function updateLayout() {
     }
 
     // avoid cumulative float error by re-deriving per cell
-    cellWidth =  (canvasWidth - PAD)  / COLS;
+    cellWidth  = (canvasWidth  - PAD) / COLS;
     cellHeight = (canvasHeight - PAD) / ROWS;
 
     redraw = true;
@@ -81,8 +81,8 @@ function updateLayout() {
 
 function deviceToScreen(x, y) {
     return {
-        x: (x * scale) + (PAD / 2),
-        y: (y * scale) + (PAD / 2)
+        x: x * ((canvasWidth - PAD) / TS_WIDTH) + (PAD / 2),
+        y: y * ((canvasHeight - PAD) / TS_HEIGHT) + (PAD / 2)
     };
 }
 
@@ -90,7 +90,7 @@ function handleMessage(event) {
   const msg = JSON.parse(event.data);
 
   if (msg.type === "matrix") {
-    // new 20x96 array → update and mark bgLayer dirty
+    // new 20x96 array -> update and mark bgLayer dirty
     dotMatrix = msg.mat;
     redraw = true;
   }
@@ -119,13 +119,10 @@ function handleMessage(event) {
   }
 }
 
-function draw() {
-  // if the dotMatrix changed, re‐draw it into bgLayer
-  if (redraw) {
-    bgLayer.background(0);
+function drawGrid() {
     for (let i = 0; i < ROWS; i++) {
       for (let j = 0; j < COLS; j++) {
-        if (j % 3 !== 2 && i % 5 !== 4) {
+        if (i % 5 !== 0 && j % 3 !== 0) { // j % 3 !== 2 && i % 5 !== 0
           const x = (PAD / 2) + (j * cellWidth) + (cellWidth / 2);
           const y = (PAD / 2) + (i * cellHeight) + (cellHeight / 2);
           bgLayer.fill(dotMatrix[i][j] ? 255 : 68);
@@ -138,6 +135,22 @@ function draw() {
         }
       }
     }
+}
+
+function drawFingers() {
+  noStroke();
+  for (let fid in fingers) {
+    const f = fingers[fid];
+    fill(f.color);
+    ellipse(f.x, f.y, scale * 30, scale * 30);
+  }
+}
+
+function draw() {
+  // if the dotMatrix changed, re‐draw it into bgLayer
+  if (redraw) {
+    bgLayer.background(0);
+    drawGrid();
     redraw = false;
   }
 
@@ -146,14 +159,5 @@ function draw() {
 
   // draw circles for any fingers that are down
   noStroke();
-  for (let fid in fingers) {
-    let f = fingers[fid];
-    fill(f.color);
-    ellipse(
-      f.x + cellWidth/2,
-      f.y + cellHeight/2,
-      scale * 40,
-      scale * 40
-    );
-  }
+  drawFingers();
 }
