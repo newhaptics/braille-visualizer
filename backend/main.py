@@ -9,23 +9,24 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
-from serial_read import SerialHandler
+from replay import FileReplayHandler
 from debug_tools import *
 
 BASE_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FRONTEND_PATH = os.path.join(BASE_PATH, 'frontend')
+LOG_PATH = os.path.join(BASE_PATH, 'log_files')
 
 # serial connection
-ser: SerialHandler | None = None
+replay: FileReplayHandler | None = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global ser
-    ser = SerialHandler()
+    global replay
+    replay = FileReplayHandler(f"{LOG_PATH}/log_2025-07-17_18-35-18_imx6ul-var-dart.log")
     try:
         yield
     finally:
-        ser.close()
+        replay.close()
 
 
 app = FastAPI(lifespan=lifespan)
@@ -57,9 +58,9 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         while True:
             try:
-                event = ser.events.get_nowait()
+                event = replay.events.get_nowait()
             except Empty:
-                await asyncio.sleep(0.01)
+                await asyncio.sleep(0.0001)
                 continue
 
             for client in clients[:]:
