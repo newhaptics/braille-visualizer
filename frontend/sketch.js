@@ -17,7 +17,7 @@ redraw = true;                     // becomes true on dot‑matrix or size chang
 
 let dotMatrix      = [];    // 20x96 array, updated on "matrix" messages
 let fingers        = {};    // map: fingerID -> { x, y, color }
-let doubleTaps     = []     // list of double taps
+let doubleTaps     = [];     // list of double taps
 
 let DEFAULT_COLOR;
 let GESTURE_COLORS;
@@ -120,8 +120,8 @@ function handleMessage(event) {
   }
   else if (msg.type === "double tap") {
     // map from logical row/col to braille‐dot indices
-    let row_idx = msg.row * 5;
-    let col_idx = msg.column * 3;
+    let row_idx = msg.row * 5 + 1;
+    let col_idx = msg.col * 3 + 1;
     for (let dy = 0; dy < 4; dy++) {
       for (let dx = 0; dx < 2; dx++) {
         doubleTaps.push({
@@ -129,6 +129,7 @@ function handleMessage(event) {
           y_idx: row_idx + dy,
           life: 300
         });
+        console.log(`Received double tap at (${col_idx + dx}, ${row_idx + dy})`)
       }
     }
   }
@@ -154,24 +155,26 @@ function drawGrid() {
 
 function drawDoubleTaps() {
     noStroke();
-    // iterate backwards so we can splice out dead taps
     for (let i = doubleTaps.length - 1; i >= 0; i--) {
-        let t = doubleTaps[i];
-        t.life--;
-        if (t.life <= 0) {
-          doubleTaps.splice(i, 1);
-          continue;
-        }
-
-        // convert cell coordinates -> screen
-        let x = (PAD/2) + (t.x_idx * cellWidth) + (cellWidth/2);
-        let y = (PAD/2) + (t.y_idx * cellHeight) + (cellHeight/2);
-
-        // fade out over time
-        let alpha = map(t.life, 0, 300, 0, 200);
-        fill(255, 255, 0, alpha);
-        ellipse(x, y, cellWidth * 0.8, cellHeight * 0.8);
+    let dt = doubleTaps[i];
+    // compute center-of-cell on screen:
+    let x = (PAD / 2) + dt.x_idx * cellWidth + cellWidth / 2;
+    let y = (PAD / 2) + dt.y_idx * cellHeight + cellHeight / 2;
+    // fade from alpha=200→0 over life=300→0
+    let alpha = map(dt.life, 0, 300, 0, 200);
+    fill(0, 210, 255, alpha);
+    ellipse(
+      x,
+      y,
+      cellWidth * 0.56,
+      cellHeight * 0.56
+    );
+    // tick down faster if you like
+    dt.life -= 3;
+    if (dt.life <= 0) {
+      doubleTaps.splice(i, 1);
     }
+  }
 }
 
 function drawFingers() {

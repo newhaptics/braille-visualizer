@@ -22,7 +22,7 @@ replay: FileReplayHandler | None = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global replay
-    replay = FileReplayHandler(f"{LOG_PATH}/log_2025-07-17_18-35-18_imx6ul-var-dart.log")
+    replay = FileReplayHandler(f"{LOG_PATH}/log_2025-07-18_15-16-10_imx6ul-var-dart.log")
     try:
         yield
     finally:
