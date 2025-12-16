@@ -146,3 +146,42 @@ class Keystroke(Signal):
             keys.append(bytes(key_bytes).decode("utf-8"))
             i += 1 + key_length
         return cls(value=set(keys))
+    
+@dataclass # 0x04
+class Touch(Signal):
+    action: str = None
+    id: int = None
+    x: int = None
+    y: int = None
+
+    # action code mapping
+    ACTION_CODES = {
+        "down": 1,
+        "up": 2,
+        "move": 3
+    }
+
+    CODE_TO_ACTION = {v: k for k, v in ACTION_CODES.items()}
+
+    @property
+    def transport_info(self) -> tuple:
+        """
+        Returns (message type, format string).
+        Format: B (action) + H (x) + H (y) + B (id) = 6 bytes total
+        """
+        return (0x04, "BHHB")
+
+    @property
+    def transport_data(self):
+        """
+        Returns data as [action_code, x, y, id].
+        """
+        action_code = self.ACTION_CODES.get(self.action, 0)
+        return [action_code, self.x, self.y, self.id]
+
+    @classmethod
+    def from_payload(cls, payload):
+        """Reconstructs UcpTouch from binary payload."""
+        action_code, x, y, finger_id = struct.unpack("BHHB", payload)
+        action = cls.CODE_TO_ACTION.get(action_code, "unknown")
+        return cls(action=action, id=finger_id, x=x, y=y)
