@@ -13,11 +13,15 @@ class NexusClient:
 
     def __init__(
         self,
+        on_printdisplay: Optional[Callable[[str], Awaitable[None]]],
         on_keystroke: Optional[Callable[[str], Awaitable[None]]],
         on_doubletap: Optional[Callable[[str], Awaitable[None]]],
+        on_touch: Optional[Callable[[bytes], Awaitable[None]]],
     ) -> None:
+        self.printdisplay_callback = on_printdisplay
         self.keystroke_callback = on_keystroke
         self.doubletap_callback = on_doubletap
+        self.touch_callback = on_touch
 
         self._closed = asyncio.Event()
         self.out_queue: asyncio.Queue = asyncio.Queue()
@@ -52,16 +56,16 @@ class NexusClient:
         finally:
             await self._finalize_transport()
 
-    def send_print(self, braille: str) -> None:
-        """Enqueue a PrintDisplay. Safe to call from any thread."""
-        signal = PrintDisplay(braille)
-        loop = self._loop
-        if loop and loop.is_running() and threading.current_thread() is not self._thread:
-            # Schedule enqueue on the client's loop thread
-            loop.call_soon_threadsafe(self.out_queue.put_nowait, signal)
-        else:
-            # Same-thread (normal asyncio usage)
-            self.out_queue.put_nowait(signal)
+    # def send_print(self, braille: str) -> None:
+    #     """Enqueue a PrintDisplay. Safe to call from any thread."""
+    #     signal = PrintDisplay(braille)
+    #     loop = self._loop
+    #     if loop and loop.is_running() and threading.current_thread() is not self._thread:
+    #         # Schedule enqueue on the client's loop thread
+    #         loop.call_soon_threadsafe(self.out_queue.put_nowait, signal)
+    #     else:
+    #         # Same-thread (normal asyncio usage)
+    #         self.out_queue.put_nowait(signal)
 
     async def close(self, timeout: float = 2.0) -> None:
         """Graceful shutdown."""
@@ -155,10 +159,14 @@ class NexusClient:
             while not self._closed.is_set():
                 data = await reader.readuntil(EOT)
                 event_id, payload = deserialize(data)
-                if event_id == 0x01 and self.doubletap_callback:
+                if event_id == 0x00 and self.printdisplay_callback:
+                    await self.printdisplay_callback(payload)
+                elif event_id == 0x01 and self.doubletap_callback:
                     await self.doubletap_callback(payload)
                 elif event_id == 0x02 and self.keystroke_callback:
                     await self.keystroke_callback(payload)
+                elif event_id == 0x04 and self.touch_callback:
+                    await self.touch_callback(payload)
         except (asyncio.CancelledError, asyncio.IncompleteReadError):
             pass  # expected on shutdown
         except Exception:
@@ -197,13 +205,14 @@ if __name__ == "__main__":
     # await client.connect()
     # await client.close()
 
+    async def printdisplay(data): print("PD", data)
     async def key(data): print("KEY", data)
     async def doubletap(data): print("DT", data)
+    async def touch(data): print("TOUCH", data)
 
     # Synchronous app: run in the background
     client = NexusClient(on_keystroke=key,
                          on_doubletap=doubletap)
     client.start_background()
-    client.send_print("Hello, dots!")
     # ...
     client.stop_background()
