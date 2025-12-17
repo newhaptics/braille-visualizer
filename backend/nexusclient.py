@@ -3,11 +3,12 @@ import threading
 import time
 import subprocess
 from typing import Awaitable, Callable, Optional
-from signaltemp import serialize, deserialize, PrintDisplay, Touch
+from signal import serialize, deserialize
 
 EOT = b"EOT\n"
 UCP_PROXY_PORT = 26541
 SENTINEL = object()
+
 
 class NexusClient:
     """Async TCP client with optional background-thread runner."""
@@ -39,34 +40,28 @@ class NexusClient:
 
     # --------------------------- public async API ----------------------------
 
-    async def connect(self, host: str = "localhost", port: int = UCP_PROXY_PORT) -> None:
-        """Open the TCP connection and run read/write tasks until closed."""
-        # start the nexus proxy
-        # self.nexus_process = subprocess.Popen(
-        #     [r"C:\ProgramData\Codex\nexusproxy.exe", "--no-daemon"],
-        #     creationflags=subprocess.CREATE_NO_WINDOW
-        # )
+    async def start(self, host: str = "localhost", port: int = UCP_PROXY_PORT) -> None:
+        """Establish connection and start read/write tasks without blocking."""
+        # Give nexus proxy time to start if needed
         await asyncio.sleep(1)
+
         self._reader, self._writer = await asyncio.open_connection(host, port)
 
-        self._read_task = asyncio.create_task(self._client_read_process(), name="nexus.read")
-        self._write_task = asyncio.create_task(self._client_write_process(), name="nexus.write")
+        self._read_task = asyncio.create_task(
+            self._client_read_process(), name="nexus.read")
+        self._write_task = asyncio.create_task(
+            self._client_write_process(), name="nexus.write")
+
+        print("NexusClient connection established and tasks started")
+
+    async def connect(self, host: str = "localhost", port: int = UCP_PROXY_PORT) -> None:
+        """Open the TCP connection and run read/write tasks until closed (blocking)."""
+        await self.start(host, port)
 
         try:
             await asyncio.gather(self._read_task, self._write_task)
         finally:
             await self._finalize_transport()
-
-    # def send_print(self, braille: str) -> None:
-    #     """Enqueue a PrintDisplay. Safe to call from any thread."""
-    #     signal = PrintDisplay(braille)
-    #     loop = self._loop
-    #     if loop and loop.is_running() and threading.current_thread() is not self._thread:
-    #         # Schedule enqueue on the client's loop thread
-    #         loop.call_soon_threadsafe(self.out_queue.put_nowait, signal)
-    #     else:
-    #         # Same-thread (normal asyncio usage)
-    #         self.out_queue.put_nowait(signal)
 
     async def close(self, timeout: float = 2.0) -> None:
         """Graceful shutdown."""
@@ -80,21 +75,22 @@ class NexusClient:
         except Exception:
             pass
 
-        # Cancel reader (unblocks readuntil)
+        # Cancel tasks
         if self._read_task and not self._read_task.done():
             self._read_task.cancel()
+        if self._write_task and not self._write_task.done():
+            self._write_task.cancel()
 
         # Wait briefly for tasks to end
-        tasks = [t for t in (self._read_task, self._write_task) if t is not None]
+        tasks = [t for t in (
+            self._read_task, self._write_task) if t is not None]
         if tasks:
             try:
                 await asyncio.wait(tasks, timeout=timeout)
             except Exception:
                 pass
-        # /T = kill the whole tree, /F = force
-        subprocess.run(["taskkill", "/PID", str(self.nexus_process.pid), "/T", "/F"], check=False)
-        await self._finalize_transport()
 
+        await self._finalize_transport()
 
     # ----------------------- optional background runner ----------------------
 
@@ -118,12 +114,14 @@ class NexusClient:
                 for t in pending:
                     t.cancel()
                 try:
-                    loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+                    loop.run_until_complete(asyncio.gather(
+                        *pending, return_exceptions=True))
                 except Exception:
                     pass
                 loop.close()
 
-        self._thread = threading.Thread(target=_run, name="NexusClientLoop", daemon=True)
+        self._thread = threading.Thread(
+            target=_run, name="NexusClientLoop", daemon=True)
         self._thread.start()
 
     def stop_background(self, timeout: float = 3.0) -> None:
@@ -170,8 +168,9 @@ class NexusClient:
                     await self.touch_callback(payload)
         except (asyncio.CancelledError, asyncio.IncompleteReadError):
             pass  # expected on shutdown
-        except Exception:
-            raise  # bubble up to connect()
+        except Exception as e:
+            print(f"Error in read process: {e}")
+            raise
 
     async def _client_write_process(self) -> None:
         writer = self._writer
@@ -187,7 +186,8 @@ class NexusClient:
                     await writer.drain()
         except asyncio.CancelledError:
             pass
-        except Exception:
+        except Exception as e:
+            print(f"Error in write process: {e}")
             raise
 
     async def _finalize_transport(self) -> None:
@@ -200,28 +200,3 @@ class NexusClient:
                 # await asyncio.wait_for(w.wait_closed(), timeout=1.0)
             except Exception:
                 pass
-
-if __name__ == "__main__":
-    # Async style (inside an event loop)
-    # await client.connect()
-    # await client.close()
-
-    print("starting this")
-
-    async def printdisplay(data): print("PD", PrintDisplay.from_payload(data))
-    async def key(data): print("KEY", data)
-    async def doubletap(data): print("DT", data)
-    async def touch(data): print("TOUCH", Touch.from_payload(data))
-
-    # Synchronous app: run in the background
-    client = NexusClient(
-        on_printdisplay=printdisplay,
-        on_keystroke=key,
-        on_doubletap=doubletap,
-        on_touch=touch
-    )
-    client.start_background()
-    while True:
-        time.sleep(0.1)
-    # ...
-    client.stop_background()
