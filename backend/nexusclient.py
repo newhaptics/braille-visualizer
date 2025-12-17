@@ -40,23 +40,15 @@ class NexusClient:
 
     # --------------------------- public async API ----------------------------
 
-    async def start(self, host: str = "localhost", port: int = UCP_PROXY_PORT) -> None:
-        """Establish connection and start read/write tasks without blocking."""
-        # Give nexus proxy time to start if needed
+    async def connect(self, host: str = "localhost", port: int = UCP_PROXY_PORT) -> None:
+        """Open the TCP connection and run read/write tasks until closed."""
         await asyncio.sleep(1)
-
         self._reader, self._writer = await asyncio.open_connection(host, port)
 
         self._read_task = asyncio.create_task(
             self._client_read_process(), name="nexus.read")
         self._write_task = asyncio.create_task(
             self._client_write_process(), name="nexus.write")
-
-        print("NexusClient connection established and tasks started")
-
-    async def connect(self, host: str = "localhost", port: int = UCP_PROXY_PORT) -> None:
-        """Open the TCP connection and run read/write tasks until closed (blocking)."""
-        await self.start(host, port)
 
         try:
             await asyncio.gather(self._read_task, self._write_task)
@@ -169,8 +161,7 @@ class NexusClient:
         except (asyncio.CancelledError, asyncio.IncompleteReadError):
             pass  # expected on shutdown
         except Exception as e:
-            print(f"Error in read process: {e}")
-            raise
+            print(f"[NexusClient] Read error: {e}")
 
     async def _client_write_process(self) -> None:
         writer = self._writer
@@ -187,8 +178,7 @@ class NexusClient:
         except asyncio.CancelledError:
             pass
         except Exception as e:
-            print(f"Error in write process: {e}")
-            raise
+            print(f"[NexusClient] Write error: {e}")
 
     async def _finalize_transport(self) -> None:
         w = self._writer
