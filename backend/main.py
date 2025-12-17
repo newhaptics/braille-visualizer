@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from nexusclient import NexusClient
 from signaltemp import DoubleTap, Touch, PrintDisplay, Keystroke
+from braille_conversion import braille_string_to_matrix
 
 BASE_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FRONTEND_PATH = os.path.join(BASE_PATH, 'frontend')
@@ -31,8 +32,24 @@ nexus = None
 async def on_printdisplay(payload):
     try:
         pd = PrintDisplay.from_payload(payload)
-        print(f"[PrintDisplay] {pd.string[:50]}...")
-        # TODO: Convert to matrix format if needed for frontend
+        print(f"[PrintDisplay] Received {len(pd.string)} characters")
+
+        # Convert braille string to 20×96 matrix
+        matrix = braille_string_to_matrix(pd.string)
+
+        # Send matrix to frontend
+        event = {
+            'type': 'matrix',
+            'mat': matrix
+        }
+        try:
+            events.put_nowait(event)
+        except:
+            try:
+                events.get_nowait()
+                events.put_nowait(event)
+            except:
+                pass
     except Exception as e:
         print(f"[ERROR] PrintDisplay callback: {e}")
 
