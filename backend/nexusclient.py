@@ -3,7 +3,7 @@ import threading
 import time
 import subprocess
 from typing import Awaitable, Callable, Optional
-from signal import serialize, deserialize
+from signaltemp import serialize, deserialize
 
 EOT = b"EOT\n"
 UCP_PROXY_PORT = 26541

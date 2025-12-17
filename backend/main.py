@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
 from nexusclient import NexusClient
-from signal import DoubleTap, Touch, PrintDisplay, Keystroke
+from signaltemp import DoubleTap, Touch, PrintDisplay, Keystroke
 
 BASE_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FRONTEND_PATH = os.path.join(BASE_PATH, 'frontend')
