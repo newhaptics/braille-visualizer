@@ -2,14 +2,14 @@
 
 def braille_string_to_matrix(braille_string: str) -> list:
     """
-    Convert a braille Unicode string to a 20x96 matrix for the visualizer.
+    Convert a braille Unicode string to a 20×96 matrix for the visualizer.
     
     Format:
     - Input: String of braille Unicode characters with newlines separating rows
-    - Each character represents one braille cell (2 dots wide x 4 dots tall)
+    - Each character represents one braille cell (2 dots wide × 4 dots tall)
     - Spaces represent empty braille cells
-    - Device has max 32 columns x 4 rows of cells
-    - Output: 20x96 matrix with spacing (matches frontend expectations)
+    - Device has max 32 columns × 4 rows of cells
+    - Output: 20×96 matrix with spacing (matches frontend expectations)
     
     Braille dot numbering (8-dot braille):
         1 4
@@ -19,12 +19,12 @@ def braille_string_to_matrix(braille_string: str) -> list:
     
     Unicode encoding (character - 0x2800 gives 8-bit pattern):
         Bit 0 = dot 1 (top left)
-        Bit 1 = dot 2
-        Bit 2 = dot 3
-        Bit 3 = dot 7 (bottom left)
-        Bit 4 = dot 4 (top right)
-        Bit 5 = dot 5
-        Bit 6 = dot 6
+        Bit 1 = dot 2 (middle-top left)
+        Bit 2 = dot 3 (middle-bottom left)
+        Bit 3 = dot 4 (top right)
+        Bit 4 = dot 5 (middle-top right)
+        Bit 5 = dot 6 (middle-bottom right)
+        Bit 6 = dot 7 (bottom left)
         Bit 7 = dot 8 (bottom right)
     """
 
@@ -61,13 +61,15 @@ def braille_string_to_matrix(braille_string: str) -> list:
                 dots = codepoint - 0x2800
 
             # Extract individual dots from the 8-bit pattern
+            # Unicode Braille: bit 0=dot1, bit 1=dot2, bit 2=dot3, bit 3=dot4,
+            #                  bit 4=dot5, bit 5=dot6, bit 6=dot7, bit 7=dot8
             dot1 = (dots >> 0) & 1  # Top left
             dot2 = (dots >> 1) & 1  # Middle-top left
             dot3 = (dots >> 2) & 1  # Middle-bottom left
-            dot7 = (dots >> 3) & 1  # Bottom left
-            dot4 = (dots >> 4) & 1  # Top right
-            dot5 = (dots >> 5) & 1  # Middle-top right
-            dot6 = (dots >> 6) & 1  # Middle-bottom right
+            dot4 = (dots >> 3) & 1  # Top right
+            dot5 = (dots >> 4) & 1  # Middle-top right
+            dot6 = (dots >> 5) & 1  # Middle-bottom right
+            dot7 = (dots >> 6) & 1  # Bottom left
             dot8 = (dots >> 7) & 1  # Bottom right
 
             # Calculate position in the 20×96 matrix
