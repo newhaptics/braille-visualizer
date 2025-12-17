@@ -1,8 +1,9 @@
 import asyncio
 import threading
+import time
 import subprocess
 from typing import Awaitable, Callable, Optional
-from signaltemp import serialize, deserialize, PrintDisplay
+from signaltemp import serialize, deserialize, PrintDisplay, Touch
 
 EOT = b"EOT\n"
 UCP_PROXY_PORT = 26541
@@ -41,10 +42,10 @@ class NexusClient:
     async def connect(self, host: str = "localhost", port: int = UCP_PROXY_PORT) -> None:
         """Open the TCP connection and run read/write tasks until closed."""
         # start the nexus proxy
-        self.nexus_process = subprocess.Popen(
-            [r"C:\ProgramData\Codex\nexusproxy.exe", "--no-daemon"],
-            creationflags=subprocess.CREATE_NO_WINDOW
-        )
+        # self.nexus_process = subprocess.Popen(
+        #     [r"C:\ProgramData\Codex\nexusproxy.exe", "--no-daemon"],
+        #     creationflags=subprocess.CREATE_NO_WINDOW
+        # )
         await asyncio.sleep(1)
         self._reader, self._writer = await asyncio.open_connection(host, port)
 
@@ -205,14 +206,22 @@ if __name__ == "__main__":
     # await client.connect()
     # await client.close()
 
-    async def printdisplay(data): print("PD", data)
+    print("starting this")
+
+    async def printdisplay(data): print("PD", PrintDisplay.from_payload(data))
     async def key(data): print("KEY", data)
     async def doubletap(data): print("DT", data)
-    async def touch(data): print("TOUCH", data)
+    async def touch(data): print("TOUCH", Touch.from_payload(data))
 
     # Synchronous app: run in the background
-    client = NexusClient(on_keystroke=key,
-                         on_doubletap=doubletap)
+    client = NexusClient(
+        on_printdisplay=printdisplay,
+        on_keystroke=key,
+        on_doubletap=doubletap,
+        on_touch=touch
+    )
     client.start_background()
+    while True:
+        time.sleep(0.1)
     # ...
     client.stop_background()
