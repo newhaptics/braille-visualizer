@@ -10,8 +10,8 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
-from nexusclient import NexusClient
-from signaltemp import DoubleTap, Touch, PrintDisplay, Keystroke
+from nexus_client import NexusClient
+from nexus_signals import DoubleTap, Touch, PrintDisplay, Keystroke
 from braille_conversion import braille_string_to_matrix
 
 BASE_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -32,7 +32,6 @@ nexus = None
 async def on_printdisplay(payload):
     try:
         pd = PrintDisplay.from_payload(payload)
-        print(f"[PrintDisplay] Received {len(pd.string)} characters")
 
         # Convert braille string to 20×96 matrix
         matrix = braille_string_to_matrix(pd.string)
@@ -81,6 +80,7 @@ async def on_touch(payload):
 async def on_doubletap(payload):
     try:
         dt = DoubleTap.from_payload(payload)
+        print(f"Received DoubleTap at {dt.row}, {dt.column}")
         event = {
             'type': 'double tap',
             'row': dt.row,
