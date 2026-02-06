@@ -237,10 +237,18 @@ async def websocket_endpoint(websocket: WebSocket):
                     if dead in clients:
                         clients.remove(dead)
 
+    recv_task = asyncio.create_task(_receive_loop())
+    send_task = asyncio.create_task(_send_loop())
+
     try:
-        # Run both loops; when the receive loop exits (client disconnected),
-        # the send loop is cancelled automatically.
-        await asyncio.gather(_receive_loop(), _send_loop())
+        # Wait for EITHER task to finish (receive exits on disconnect)
+        done, pending = await asyncio.wait(
+            [recv_task, send_task],
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+        # Cancel whichever is still running
+        for task in pending:
+            task.cancel()
     except Exception as e:
         print(f"[WebSocket] Error: {e}")
     finally:
