@@ -19,7 +19,8 @@
       "output": "out"
     },
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "sign": false
     },
     "extraResources": [
       {
