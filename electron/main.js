@@ -35,9 +35,15 @@ function spawnNexusProxy() {
   const exe = resourcePath("nexusproxy.exe");
   console.log("[electron] Starting nexusproxy:", exe);
   nexusProc = spawn(exe, [], {
-    stdio: "ignore",
+    stdio: "pipe",
     windowsHide: true,
   });
+  nexusProc.stdout.on("data", (d) =>
+    process.stdout.write("[nexusproxy] " + d)
+  );
+  nexusProc.stderr.on("data", (d) =>
+    process.stderr.write("[nexusproxy] " + d)
+  );
   nexusProc.on("error", (err) =>
     console.error("[electron] nexusproxy error:", err.message)
   );
