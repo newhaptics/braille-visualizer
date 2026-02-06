@@ -263,4 +263,9 @@ async def websocket_endpoint(websocket: WebSocket):
 # ============================================================================
 if __name__ == "__main__":
     frozen = getattr(sys, 'frozen', False)
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=not frozen)
+    if frozen:
+        # Frozen exe can't import "main" by name — pass the app object directly
+        uvicorn.run(app, host="0.0.0.0", port=8000)
+    else:
+        # Dev mode: string form required for reload to work
+        uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
