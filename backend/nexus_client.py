@@ -43,7 +43,13 @@ class NexusClient:
     async def connect(self, host: str = "localhost", port: int = UCP_PROXY_PORT) -> None:
         """Open the TCP connection and run read/write tasks until closed."""
         await asyncio.sleep(1)
-        self._reader, self._writer = await asyncio.open_connection(host, port)
+        print(f"[NexusClient] Connecting to {host}:{port}...")
+        try:
+            self._reader, self._writer = await asyncio.open_connection(host, port)
+        except Exception as e:
+            print(f"[NexusClient] FAILED to connect to {host}:{port}: {e}")
+            return
+        print(f"[NexusClient] Connected to {host}:{port}")
 
         self._read_task = asyncio.create_task(
             self._client_read_process(), name="nexus.read")
@@ -150,6 +156,7 @@ class NexusClient:
             while not self._closed.is_set():
                 data = await reader.readuntil(EOT)
                 event_id, payload = deserialize(data)
+                print(f"[NexusClient] Received event_id=0x{event_id:02X}, {len(payload)} bytes")
                 if event_id == 0x00 and self.printdisplay_callback:
                     await self.printdisplay_callback(payload)
                 elif event_id == 0x01 and self.doubletap_callback:
