@@ -43,9 +43,9 @@ function spawnBackend() {
     args = [];
     cwd = resourcePath("backend");
   } else {
-    // Dev: run Python directly
+    // Dev: run Python directly (-u = unbuffered so prints appear immediately)
     cmd = "python";
-    args = [path.join(__dirname, "..", "backend", "main.py")];
+    args = ["-u", path.join(__dirname, "..", "backend", "main.py")];
     cwd = path.join(__dirname, "..", "backend");
   }
 
