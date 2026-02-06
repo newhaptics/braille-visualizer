@@ -1,6 +1,11 @@
 # PyCharm specific
 .idea/
 
+# Electron / Node
+node_modules/
+out/
+dist/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

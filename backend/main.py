@@ -1,5 +1,6 @@
 # === backend/main.py ===
 import os
+import sys
 import uvicorn
 import asyncio
 from contextlib import asynccontextmanager
@@ -14,7 +15,13 @@ from nexus_client import NexusClient
 from nexus_signals import DoubleTap, Touch, PrintDisplay, Keystroke
 from braille_conversion import braille_string_to_matrix
 
-BASE_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# When running as a PyInstaller bundle, sys._MEIPASS points to the temp
+# directory where bundled data files are extracted.  In normal (unfrozen)
+# mode we keep the original behaviour.
+if getattr(sys, 'frozen', False):
+    BASE_PATH = sys._MEIPASS
+else:
+    BASE_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FRONTEND_PATH = os.path.join(BASE_PATH, 'frontend')
 
 # ============================================================================
@@ -245,4 +252,5 @@ async def websocket_endpoint(websocket: WebSocket):
 # RUN
 # ============================================================================
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    frozen = getattr(sys, 'frozen', False)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=not frozen)

@@ -1,0 +1,36 @@
+{
+  "name": "braille-visualizer",
+  "version": "1.0.0",
+  "description": "Real-time braille display visualizer",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "electron .",
+    "build-python": "pyinstaller backend/backend.spec --distpath dist",
+    "dist": "electron-builder"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "com.braille-visualizer.app",
+    "productName": "Braille Visualizer",
+    "directories": {
+      "output": "out"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "extraResources": [
+      {
+        "from": "nexusproxy.exe",
+        "to": "nexusproxy.exe"
+      },
+      {
+        "from": "dist/backend",
+        "to": "backend",
+        "filter": ["**/*"]
+      }
+    ]
+  }
+}
