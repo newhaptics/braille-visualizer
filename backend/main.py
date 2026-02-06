@@ -200,52 +200,54 @@ async def websocket_endpoint(websocket: WebSocket):
     """WebSocket endpoint - streams events to frontend"""
     await websocket.accept()
 
-    # Add client safely
     async with clients_lock:
         clients.append(websocket)
 
     print(f"[WebSocket] Client connected (total: {len(clients)})")
 
-    try:
+    async def _receive_loop():
+        """Wait for client disconnect (we don't expect messages, just detect close)."""
+        try:
+            while True:
+                await websocket.receive_text()
+        except WebSocketDisconnect:
+            pass
+
+    async def _send_loop():
+        """Poll the event queue and broadcast to all clients."""
         while True:
-            # Try to get an event
             try:
                 event = events.get_nowait()
             except Empty:
-                # No events, wait a bit
                 await asyncio.sleep(0.01)
                 continue
 
-            # Broadcast to all clients
             async with clients_lock:
                 dead_clients = []
-
                 for client in clients:
                     try:
                         await client.send_json(event)
-                    except Exception as e:
-                        print(f"[WebSocket] Failed to send to client: {e}")
+                    except Exception:
                         dead_clients.append(client)
-
-                # Remove dead clients
                 for dead in dead_clients:
                     try:
                         await dead.close()
-                    except:
+                    except Exception:
                         pass
                     if dead in clients:
                         clients.remove(dead)
 
-    except WebSocketDisconnect:
-        print("[WebSocket] Client disconnected")
+    try:
+        # Run both loops; when the receive loop exits (client disconnected),
+        # the send loop is cancelled automatically.
+        await asyncio.gather(_receive_loop(), _send_loop())
     except Exception as e:
         print(f"[WebSocket] Error: {e}")
     finally:
-        # Remove this client
         async with clients_lock:
             if websocket in clients:
                 clients.remove(websocket)
-        print(f"[WebSocket] Remaining clients: {len(clients)}")
+        print(f"[WebSocket] Client disconnected (remaining: {len(clients)})")
 
 
 # ============================================================================
