@@ -54,6 +54,7 @@ function spawnBackend() {
     cwd,
     stdio: "pipe",
     windowsHide: true,
+    env: { ...process.env, PYTHONUNBUFFERED: "1" },
   });
 
   backendProc.stdout.on("data", (d) => process.stdout.write(d));
