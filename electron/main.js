@@ -1,5 +1,5 @@
 const { app, BrowserWindow } = require("electron");
-const { spawn } = require("child_process");
+const { spawn, execSync } = require("child_process");
 const path = require("path");
 const http = require("http");
 
@@ -18,6 +18,18 @@ function resourcePath(...segments) {
 // ---------------------------------------------------------------------------
 let nexusProc = null;
 let backendProc = null;
+
+function killStaleProcesses() {
+  // Kill any leftover nexusproxy/backend instances from previous runs
+  for (const name of ["nexusproxy.exe", "backend.exe"]) {
+    try {
+      execSync(`taskkill /F /IM ${name}`, { stdio: "ignore" });
+      console.log(`[electron] Killed stale ${name}`);
+    } catch {
+      // No instances found — that's fine
+    }
+  }
+}
 
 function spawnNexusProxy() {
   const exe = resourcePath("nexusproxy.exe");
@@ -94,6 +106,9 @@ function waitForBackend(url, timeoutMs = 30000) {
 let mainWindow = null;
 
 async function createWindow() {
+  // 0. Kill leftover processes from previous runs
+  killStaleProcesses();
+
   // 1. Launch subprocesses
   spawnNexusProxy();
   spawnBackend();
@@ -130,7 +145,12 @@ function killSubprocesses() {
   ]) {
     if (proc && !proc.killed) {
       console.log(`[electron] Killing ${name} (pid ${proc.pid})`);
-      proc.kill();
+      try {
+        // taskkill /F /T kills the process and its entire child tree
+        execSync(`taskkill /F /T /PID ${proc.pid}`, { stdio: "ignore" });
+      } catch {
+        proc.kill();
+      }
     }
   }
   nexusProc = null;
