@@ -19,11 +19,13 @@ class NexusClient:
         on_keystroke: Optional[Callable[[str], Awaitable[None]]],
         on_doubletap: Optional[Callable[[str], Awaitable[None]]],
         on_touch: Optional[Callable[[bytes], Awaitable[None]]],
+        on_setdotmatrix: Optional[Callable[[bytes], Awaitable[None]]] = None,
     ) -> None:
         self.printdisplay_callback = on_printdisplay
         self.keystroke_callback = on_keystroke
         self.doubletap_callback = on_doubletap
         self.touch_callback = on_touch
+        self.setdotmatrix_callback = on_setdotmatrix
 
         self._closed = asyncio.Event()
         self.out_queue: asyncio.Queue = asyncio.Queue()
@@ -165,6 +167,8 @@ class NexusClient:
                     await self.keystroke_callback(payload)
                 elif event_id == 0x04 and self.touch_callback:
                     await self.touch_callback(payload)
+                elif event_id == 0x05 and self.setdotmatrix_callback:
+                    await self.setdotmatrix_callback(payload)
         except (asyncio.CancelledError, asyncio.IncompleteReadError):
             pass  # expected on shutdown
         except Exception as e:

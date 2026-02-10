@@ -147,6 +147,39 @@ class Keystroke(Signal):
             i += 1 + key_length
         return cls(value=set(keys))
     
+@dataclass  # 0x05
+class SetDotMatrix(Signal):
+    matrix: list = None  # 20×96 list-of-lists (0/1 ints)
+
+    @property
+    def transport_info(self) -> tuple:
+        return (0x05, "240B")
+
+    @property
+    def transport_data(self):
+        data = []
+        for row in self.matrix:
+            for byte_idx in range(12):
+                byte_val = 0
+                for bit in range(8):
+                    col = byte_idx * 8 + bit
+                    if col < len(row) and row[col]:
+                        byte_val |= (1 << (7 - bit))
+                data.append(byte_val)
+        return data
+
+    @classmethod
+    def from_payload(cls, payload):
+        matrix = []
+        for row_idx in range(20):
+            row = []
+            for byte_idx in range(12):
+                byte_val = payload[row_idx * 12 + byte_idx]
+                for bit in range(8):
+                    row.append(1 if (byte_val & (1 << (7 - bit))) else 0)
+            matrix.append(row[:96])
+        return cls(matrix=matrix)
+
 @dataclass # 0x04
 class Touch(Signal):
     action: str = None

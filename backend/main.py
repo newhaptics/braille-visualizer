@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from nexus_client import NexusClient
-from nexus_signals import DoubleTap, Touch, PrintDisplay, Keystroke
+from nexus_signals import DoubleTap, Touch, PrintDisplay, Keystroke, SetDotMatrix
 from braille_conversion import braille_string_to_matrix
 from i2c_controller import I2CController
 from serial_proxy import SerialProxy
@@ -129,6 +129,25 @@ async def on_doubletap(payload):
         print(f"[ERROR] DoubleTap callback: {e}")
 
 
+async def on_setdotmatrix(payload):
+    try:
+        sdm = SetDotMatrix.from_payload(payload)
+        event = {
+            'type': 'matrix',
+            'mat': sdm.matrix
+        }
+        try:
+            events.put_nowait(event)
+        except:
+            try:
+                events.get_nowait()
+                events.put_nowait(event)
+            except:
+                pass
+    except Exception as e:
+        print(f"[ERROR] SetDotMatrix callback: {e}")
+
+
 async def on_keystroke(payload):
     try:
         ks = Keystroke.from_payload(payload)
@@ -164,7 +183,8 @@ async def lifespan(app: FastAPI):
         on_printdisplay=on_printdisplay,
         on_keystroke=on_keystroke,
         on_doubletap=on_doubletap,
-        on_touch=on_touch
+        on_touch=on_touch,
+        on_setdotmatrix=on_setdotmatrix
     )
 
     print("Starting NexusClient connection...")
