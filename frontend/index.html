@@ -3,15 +3,437 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Codex Visualizer</title>
+  <title>Touch Tuning — Codex Visualizer</title>
   <script src="/static/lib/p5.min.js"></script>
   <script src="/static/config.js"></script>
   <script src="/static/sketch.js" defer></script>
   <style>
-    body { margin: 0; background: #222; }
-    canvas { display: block; margin: auto; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #1a1a1a; color: #ccc; font-family: 'Segoe UI', system-ui, sans-serif; font-size: 13px; }
+
+    #canvas-container { display: flex; justify-content: center; padding: 10px 10px 0; }
+    canvas { display: block; }
+
+    /* ── Control Panel ── */
+    #control-panel {
+      background: #222; border-top: 1px solid #444; padding: 12px 20px;
+      display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start;
+    }
+
+    .panel-section {
+      background: #2a2a2a; border: 1px solid #3a3a3a; border-radius: 6px;
+      padding: 10px 14px; min-width: 180px;
+    }
+    .panel-section h3 {
+      font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px;
+      color: #888; margin-bottom: 8px; font-weight: 600;
+    }
+
+    /* SSH connection */
+    #ssh-section { min-width: 240px; }
+    #ssh-section .row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
+    #ssh-host { flex: 1; background: #333; border: 1px solid #555; border-radius: 3px; color: #eee; padding: 4px 8px; font-size: 13px; }
+    .btn {
+      background: #444; border: 1px solid #666; border-radius: 3px; color: #ddd;
+      padding: 4px 10px; cursor: pointer; font-size: 12px; white-space: nowrap;
+    }
+    .btn:hover { background: #555; }
+    .btn.active { background: #2a6; border-color: #3b7; color: #fff; }
+    .btn.danger { background: #a33; border-color: #c44; }
+    .btn.danger:hover { background: #c44; }
+    #ssh-status { font-size: 11px; color: #888; }
+    #ssh-status.connected { color: #4c8; }
+
+    /* Register controls */
+    .reg-control { margin-bottom: 8px; }
+    .reg-control:last-child { margin-bottom: 0; }
+    .reg-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; }
+    .reg-name {
+      font-weight: 600; color: #aaa; font-size: 12px; font-family: monospace;
+      cursor: help; border-bottom: 1px dotted #666;
+    }
+    .reg-value { font-family: monospace; color: #4cf; font-size: 12px; min-width: 45px; text-align: right; }
+    .reg-slider-row { display: flex; gap: 6px; align-items: center; }
+    .reg-slider {
+      flex: 1; -webkit-appearance: none; appearance: none; height: 4px;
+      background: #444; border-radius: 2px; outline: none;
+    }
+    .reg-slider::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none; width: 14px; height: 14px;
+      border-radius: 50%; background: #6af; cursor: pointer;
+    }
+    .reg-input {
+      width: 55px; background: #333; border: 1px solid #555; border-radius: 3px;
+      color: #eee; padding: 2px 4px; font-size: 12px; text-align: right; font-family: monospace;
+      -moz-appearance: textfield;
+    }
+    .reg-input::-webkit-outer-spin-button,
+    .reg-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    .reg-btn {
+      width: 26px; height: 22px; padding: 0; font-size: 16px; line-height: 20px;
+      text-align: center; flex-shrink: 0; font-weight: bold;
+    }
+
+    /* Success flash */
+    .flash {
+      display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px;
+      border-radius: 3px; opacity: 0; transition: opacity 0.3s;
+    }
+    .flash.show { opacity: 1; }
+    .flash.success { color: #4c8; }
+    .flash.error { color: #f66; }
+
+    /* Actions */
+    #actions-section { display: flex; flex-direction: column; gap: 6px; }
+    #actions-section .btn { width: 100%; text-align: center; }
+
+    /* SOM Control */
+    #som-section { display: flex; flex-direction: column; gap: 6px; }
+    #som-section .btn { width: 100%; text-align: center; }
+    .btn.primary { background: #26a; border-color: #37b; }
+    .btn.primary:hover { background: #37b; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    #som-status { font-size: 11px; color: #888; margin-top: 2px; }
+
+    /* Amp legend */
+    #amp-legend { display: flex; align-items: center; gap: 8px; font-size: 11px; }
+    #amp-gradient {
+      width: 100px; height: 10px; border-radius: 2px;
+      background: linear-gradient(to right, #33f, #3ff, #3f3, #ff3, #f33);
+    }
   </style>
 </head>
 <body>
+  <div id="canvas-container"></div>
+
+  <div id="control-panel">
+    <!-- SSH Connection -->
+    <div class="panel-section" id="ssh-section">
+      <h3>SSH Connection</h3>
+      <div class="row">
+        <input type="text" id="ssh-host" placeholder="SOM IP (e.g. 192.168.1.100)" />
+        <button class="btn" id="ssh-connect-btn" onclick="toggleSSH()">Connect</button>
+      </div>
+      <div id="ssh-status">Disconnected</div>
+    </div>
+
+    <!-- Registers: 8-bit -->
+    <div class="panel-section" id="reg-8bit-section">
+      <h3>8-bit Registers</h3>
+      <div id="reg-TCHTHR" class="reg-control">
+        <div class="reg-header">
+          <span class="reg-name" title="Touch detection threshold in 8-bit delta units. Defines how large a node's touch delta must be to register as a touch. Higher values = less sensitive, lower = more sensitive. Typical: 30-80.">TCHTHR</span>
+          <span class="reg-value" id="val-TCHTHR">—</span>
+        </div>
+        <div class="reg-slider-row">
+          <button class="btn reg-btn" onclick="regStep('TCHTHR', -1)">&minus;</button>
+          <input type="range" class="reg-slider" id="slider-TCHTHR" min="0" max="255" value="40" oninput="onSlider('TCHTHR')" />
+          <button class="btn reg-btn" onclick="regStep('TCHTHR', 1)">+</button>
+          <input type="number" class="reg-input" id="input-TCHTHR" min="0" max="255" value="40" onchange="onInput('TCHTHR')" />
+        </div>
+      </div>
+      <div id="reg-TCHHYST" class="reg-control">
+        <div class="reg-header">
+          <span class="reg-name" title="Touch detection hysteresis. A touch is detected when delta >= TCHTHR, and released when delta < (TCHTHR - TCHHYST). Capped internally to 75% of TCHTHR. Recommended: <=25% of TCHTHR. 0 = no hysteresis.">TCHHYST</span>
+          <span class="reg-value" id="val-TCHHYST">—</span>
+        </div>
+        <div class="reg-slider-row">
+          <button class="btn reg-btn" onclick="regStep('TCHHYST', -1)">&minus;</button>
+          <input type="range" class="reg-slider" id="slider-TCHHYST" min="0" max="255" value="20" oninput="onSlider('TCHHYST')" />
+          <button class="btn reg-btn" onclick="regStep('TCHHYST', 1)">+</button>
+          <input type="number" class="reg-input" id="input-TCHHYST" min="0" max="255" value="20" onchange="onInput('TCHHYST')" />
+        </div>
+      </div>
+      <div id="reg-AMPLHYST" class="reg-control">
+        <div class="reg-header">
+          <span class="reg-name" title="Amplitude change hysteresis. The touch amplitude must change by more than this value before a new report is sent to the host. Prevents excessive messaging. Units: 8-bit deltas.">AMPLHYST</span>
+          <span class="reg-value" id="val-AMPLHYST">—</span>
+        </div>
+        <div class="reg-slider-row">
+          <button class="btn reg-btn" onclick="regStep('AMPLHYST', -1)">&minus;</button>
+          <input type="range" class="reg-slider" id="slider-AMPLHYST" min="0" max="255" value="0" oninput="onSlider('AMPLHYST')" />
+          <button class="btn reg-btn" onclick="regStep('AMPLHYST', 1)">+</button>
+          <input type="number" class="reg-input" id="input-AMPLHYST" min="0" max="255" value="0" onchange="onInput('AMPLHYST')" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Registers: 16-bit -->
+    <div class="panel-section" id="reg-16bit-section">
+      <h3>16-bit Registers</h3>
+      <div id="reg-MOVHYSTI" class="reg-control">
+        <div class="reg-header">
+          <span class="reg-name" title="Initial movement hysteresis applied on first touchdown. The touch position must move beyond this threshold before position updates begin, allowing the host to distinguish a press from a drag. Range: 0-4095.">MOVHYSTI</span>
+          <span class="reg-value" id="val-MOVHYSTI">—</span>
+        </div>
+        <div class="reg-slider-row">
+          <button class="btn reg-btn" onclick="regStep('MOVHYSTI', -1)">&minus;</button>
+          <input type="range" class="reg-slider" id="slider-MOVHYSTI" min="0" max="4095" value="50" oninput="onSlider('MOVHYSTI')" />
+          <button class="btn reg-btn" onclick="regStep('MOVHYSTI', 1)">+</button>
+          <input type="number" class="reg-input" id="input-MOVHYSTI" min="0" max="4095" value="50" onchange="onInput('MOVHYSTI')" />
+        </div>
+      </div>
+      <div id="reg-MOVHYSTN" class="reg-control">
+        <div class="reg-header">
+          <span class="reg-name" title="Next movement hysteresis applied after initial threshold exceeded. Applied per-axis in the reverse direction of travel to suppress jitter while allowing smooth movement. Internally reduced while touch is moving. Range: 0-4095.">MOVHYSTN</span>
+          <span class="reg-value" id="val-MOVHYSTN">—</span>
+        </div>
+        <div class="reg-slider-row">
+          <button class="btn reg-btn" onclick="regStep('MOVHYSTN', -1)">&minus;</button>
+          <input type="range" class="reg-slider" id="slider-MOVHYSTN" min="0" max="4095" value="10" oninput="onSlider('MOVHYSTN')" />
+          <button class="btn reg-btn" onclick="regStep('MOVHYSTN', 1)">+</button>
+          <input type="number" class="reg-input" id="input-MOVHYSTN" min="0" max="4095" value="10" onchange="onInput('MOVHYSTN')" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="panel-section" id="actions-section">
+      <h3>Actions</h3>
+      <button class="btn" onclick="readAllRegisters()">Read All</button>
+      <button class="btn" onclick="writeAllRegisters()">Write All</button>
+      <button class="btn danger" onclick="restoreDefaults()">Restore Defaults</button>
+      <span class="flash" id="action-flash"></span>
+    </div>
+
+    <!-- SOM Control -->
+    <div class="panel-section" id="som-section">
+      <h3>SOM Control</h3>
+      <button class="btn primary" id="btn-deploy-run" onclick="somDeployAndRun()">Deploy &amp; Run</button>
+      <button class="btn" id="btn-som-run" onclick="somRun()">Run Dev</button>
+      <button class="btn danger" id="btn-som-stop" onclick="somStop()">Stop Dev</button>
+      <div id="som-status"></div>
+    </div>
+
+    <!-- Amp Legend -->
+    <div class="panel-section">
+      <h3>Touch Amplitude</h3>
+      <div id="amp-legend">
+        <span>0</span>
+        <div id="amp-gradient"></div>
+        <span>100+</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ── SSH Connection with auto-connect ──
+    let sshConnected = false;
+    const SSH_STORAGE_KEY = "touch-tuning-ssh-host";
+
+    // Restore last host and auto-connect on load
+    window.addEventListener("DOMContentLoaded", () => {
+      const saved = localStorage.getItem(SSH_STORAGE_KEY);
+      if (saved) {
+        document.getElementById("ssh-host").value = saved;
+        autoConnect(saved);
+      }
+    });
+
+    async function autoConnect(host) {
+      const btn = document.getElementById("ssh-connect-btn");
+      const status = document.getElementById("ssh-status");
+      btn.textContent = "...";
+      btn.disabled = true;
+      status.textContent = "Connecting to " + host + "...";
+      try {
+        const res = await fetch(API_BASE + "/api/ssh/connect", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ host: host })
+        });
+        const data = await res.json();
+        sshConnected = data.status === "connected";
+        if (sshConnected) readAllRegisters();
+      } catch (e) {
+        console.error("SSH auto-connect failed:", e);
+      }
+      btn.disabled = false;
+      updateSSHStatus();
+    }
+
+    async function toggleSSH() {
+      if (sshConnected) {
+        await fetch(API_BASE + "/api/ssh/disconnect", { method: "POST" });
+        sshConnected = false;
+        updateSSHStatus();
+      } else {
+        const host = document.getElementById("ssh-host").value.trim();
+        if (!host) { alert("Enter SOM IP address"); return; }
+        // Save for next time
+        localStorage.setItem(SSH_STORAGE_KEY, host);
+        await autoConnect(host);
+      }
+    }
+
+    function updateSSHStatus() {
+      const el = document.getElementById("ssh-status");
+      const btn = document.getElementById("ssh-connect-btn");
+      if (sshConnected) {
+        el.textContent = "Connected to " + document.getElementById("ssh-host").value;
+        el.className = "connected";
+        btn.textContent = "Disconnect";
+        btn.className = "btn danger";
+      } else {
+        el.textContent = "Disconnected";
+        el.className = "";
+        btn.textContent = "Connect";
+        btn.className = "btn";
+      }
+    }
+
+    // ── Register Controls ──
+    const REG_NAMES = ["TCHTHR", "TCHHYST", "MOVHYSTI", "MOVHYSTN", "AMPLHYST"];
+
+    function onSlider(name) {
+      const val = document.getElementById("slider-" + name).value;
+      document.getElementById("input-" + name).value = val;
+    }
+
+    function onInput(name) {
+      const val = document.getElementById("input-" + name).value;
+      const slider = document.getElementById("slider-" + name);
+      slider.value = Math.min(val, parseInt(slider.max));
+    }
+
+    function regStep(name, dir) {
+      const slider = document.getElementById("slider-" + name);
+      const input = document.getElementById("input-" + name);
+      let val = parseInt(slider.value) + dir;
+      val = Math.max(parseInt(slider.min), Math.min(parseInt(slider.max), val));
+      slider.value = val;
+      input.value = val;
+    }
+
+    function showFlash(msg, type) {
+      const el = document.getElementById("action-flash");
+      el.textContent = msg;
+      el.className = "flash " + type + " show";
+      clearTimeout(el._timer);
+      el._timer = setTimeout(() => { el.classList.remove("show"); }, 2000);
+    }
+
+    async function readAllRegisters() {
+      if (!sshConnected) return;
+      try {
+        const res = await fetch(API_BASE + "/api/registers");
+        const data = await res.json();
+        if (data.registers) {
+          for (const name of REG_NAMES) {
+            const val = data.registers[name];
+            if (typeof val === "number") {
+              document.getElementById("val-" + name).textContent = val;
+              document.getElementById("slider-" + name).value = Math.min(val, parseInt(document.getElementById("slider-" + name).max));
+              document.getElementById("input-" + name).value = val;
+            }
+          }
+          showFlash("Success", "success");
+        }
+      } catch (e) {
+        console.error("Read registers failed:", e);
+        showFlash("Read failed", "error");
+      }
+    }
+
+    async function writeRegister(name) {
+      if (!sshConnected) return;
+      const val = parseInt(document.getElementById("input-" + name).value);
+      try {
+        const res = await fetch(API_BASE + "/api/registers/" + name, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ value: val })
+        });
+        const data = await res.json();
+        if (data.readback !== undefined) {
+          document.getElementById("val-" + name).textContent = data.readback;
+        }
+      } catch (e) {
+        console.error("Write register failed:", e);
+      }
+    }
+
+    async function writeAllRegisters() {
+      try {
+        for (const name of REG_NAMES) {
+          await writeRegister(name);
+        }
+        showFlash("Written", "success");
+      } catch (e) {
+        showFlash("Write failed", "error");
+      }
+    }
+
+    // ── SOM Control ──
+    function setSomStatus(msg) {
+      document.getElementById("som-status").textContent = msg;
+    }
+    function setSomButtonsDisabled(disabled) {
+      document.getElementById("btn-deploy-run").disabled = disabled;
+      document.getElementById("btn-som-run").disabled = disabled;
+      document.getElementById("btn-som-stop").disabled = disabled;
+    }
+
+    async function somDeployAndRun() {
+      setSomButtonsDisabled(true);
+      setSomStatus("Deploying & starting...");
+      try {
+        const res = await fetch(API_BASE + "/api/som/deploy-and-run", { method: "POST" });
+        const data = await res.json();
+        setSomStatus(data.status === "ok" ? "Deployed & running" : "Error: " + (data.output || "").slice(-100));
+      } catch (e) {
+        setSomStatus("Request failed");
+      }
+      setSomButtonsDisabled(false);
+    }
+
+    async function somRun() {
+      setSomButtonsDisabled(true);
+      setSomStatus("Starting dev instance...");
+      try {
+        const res = await fetch(API_BASE + "/api/som/run", { method: "POST" });
+        const data = await res.json();
+        setSomStatus(data.status === "ok" ? "Dev instance running" : "Error: " + (data.output || "").slice(-100));
+      } catch (e) {
+        setSomStatus("Request failed");
+      }
+      setSomButtonsDisabled(false);
+    }
+
+    async function somStop() {
+      setSomButtonsDisabled(true);
+      setSomStatus("Stopping...");
+      try {
+        const res = await fetch(API_BASE + "/api/som/stop", { method: "POST" });
+        const data = await res.json();
+        setSomStatus(data.status === "ok" ? "Dev instance stopped" : "Error: " + (data.output || "").slice(-100));
+      } catch (e) {
+        setSomStatus("Request failed");
+      }
+      setSomButtonsDisabled(false);
+    }
+
+    async function restoreDefaults() {
+      if (!sshConnected) return;
+      try {
+        const res = await fetch(API_BASE + "/api/registers/defaults", { method: "POST" });
+        const data = await res.json();
+        if (data.registers) {
+          for (const name of REG_NAMES) {
+            const val = data.registers[name];
+            if (typeof val === "number") {
+              document.getElementById("val-" + name).textContent = val;
+              document.getElementById("slider-" + name).value = Math.min(val, parseInt(document.getElementById("slider-" + name).max));
+              document.getElementById("input-" + name).value = val;
+            }
+          }
+          showFlash("Defaults restored", "success");
+        }
+      } catch (e) {
+        console.error("Restore defaults failed:", e);
+        showFlash("Restore failed", "error");
+      }
+    }
+  </script>
 </body>
 </html>

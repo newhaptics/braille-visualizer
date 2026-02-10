@@ -1,1 +1,2 @@
-const WS_HOST = "ws://localhost:8000/ws"; // switch to cloud-based backend deployment
+const WS_HOST = "ws://localhost:8001/ws";
+const API_BASE = "http://localhost:8001";

@@ -153,6 +153,8 @@ class Touch(Signal):
     id: int = None
     x: int = None
     y: int = None
+    amp: int = None
+    area: int = None
 
     # action code mapping
     ACTION_CODES = {
@@ -167,21 +169,21 @@ class Touch(Signal):
     def transport_info(self) -> tuple:
         """
         Returns (message type, format string).
-        Format: B (action) + H (x) + H (y) + B (id) = 6 bytes total
+        Format: B (action) + H (x) + H (y) + B (id) + B (amp) + B (area) = 8 bytes total
         """
-        return (0x04, "BHHB")
+        return (0x04, "BHHBBB")
 
     @property
     def transport_data(self):
         """
-        Returns data as [action_code, x, y, id].
+        Returns data as [action_code, x, y, id, amp, area].
         """
         action_code = self.ACTION_CODES.get(self.action, 0)
-        return [action_code, self.x, self.y, self.id]
+        return [action_code, self.x, self.y, self.id, self.amp or 0, self.area or 0]
 
     @classmethod
     def from_payload(cls, payload):
         """Reconstructs UcpTouch from binary payload."""
-        action_code, x, y, finger_id = struct.unpack("BHHB", payload)
+        action_code, x, y, finger_id, amp, area = struct.unpack("BHHBBB", payload)
         action = cls.CODE_TO_ACTION.get(action_code, "unknown")
-        return cls(action=action, id=finger_id, x=x, y=y)
+        return cls(action=action, id=finger_id, x=x, y=y, amp=amp, area=area)

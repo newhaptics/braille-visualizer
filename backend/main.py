@@ -10,10 +10,13 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 from nexus_client import NexusClient
 from nexus_signals import DoubleTap, Touch, PrintDisplay, Keystroke
 from braille_conversion import braille_string_to_matrix
+from i2c_controller import I2CController
+from serial_proxy import SerialProxy
 
 # When running as a PyInstaller bundle, sys._MEIPASS points to the temp
 # directory where bundled data files are extracted.  In normal (unfrozen)
@@ -31,6 +34,25 @@ events = Queue(maxsize=1000)  # Bounded queue prevents memory leaks
 clients = []
 clients_lock = asyncio.Lock()
 nexus = None
+i2c = I2CController()
+proxy_task = None
+
+
+# ============================================================================
+# COM PORT AUTO-DETECTION
+# ============================================================================
+CODEX_VID_PID = "376B:0001"  # Codex USB gadget serial
+
+def find_codex_port() -> str | None:
+    """Auto-detect the Codex USB serial port by VID:PID."""
+    try:
+        import serial.tools.list_ports
+        for port in serial.tools.list_ports.comports():
+            if CODEX_VID_PID.lower() in (port.hwid or "").lower():
+                return port.device
+    except ImportError:
+        pass
+    return None
 
 
 # ============================================================================
@@ -68,7 +90,9 @@ async def on_touch(payload):
             'action': touch.action,
             'id': touch.id,
             'x': touch.x,
-            'y': touch.y
+            'y': touch.y,
+            'amp': touch.amp,
+            'area': touch.area,
         }
         # Non-blocking put - if queue is full, drop oldest
         try:
@@ -118,11 +142,22 @@ async def on_keystroke(payload):
 # ============================================================================
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global nexus
+    global nexus, proxy_task
 
     print("=" * 60)
     print("Starting application...")
     print("=" * 60)
+
+    # Auto-detect and start serial proxy
+    com_port = os.environ.get("COM_PORT") or find_codex_port()
+    if com_port:
+        print(f"[Proxy] Auto-detected Codex on {com_port}")
+        proxy = SerialProxy(com_port, 26541)
+        proxy_task = asyncio.create_task(proxy.start())
+        await asyncio.sleep(1)  # let proxy bind TCP port
+    else:
+        print("[Proxy] No Codex USB serial found — running without serial proxy")
+        print("[Proxy] Set COM_PORT env var or connect the device via USB")
 
     # Create and start NexusClient
     nexus = NexusClient(
@@ -138,6 +173,15 @@ async def lifespan(app: FastAPI):
     # Give it a moment to connect
     await asyncio.sleep(2)
     print("NexusClient started")
+
+    # Try to connect I2C controller if SOM_HOST is set
+    som_host = os.environ.get("SOM_HOST")
+    if som_host:
+        try:
+            await i2c.connect(som_host)
+        except Exception as e:
+            print(f"[I2C] Could not connect at startup: {e}")
+
     print("Application ready!")
     print("=" * 60)
 
@@ -148,10 +192,21 @@ async def lifespan(app: FastAPI):
     print("Shutting down application...")
     print("=" * 60)
 
+    if i2c.connected:
+        await i2c.disconnect()
+
     if nexus:
         print("Stopping NexusClient...")
         nexus.stop_background()
         print("NexusClient stopped")
+
+    if proxy_task and not proxy_task.done():
+        proxy_task.cancel()
+        try:
+            await proxy_task
+        except asyncio.CancelledError:
+            pass
+        print("Serial proxy stopped")
 
     print("Shutdown complete")
     print("=" * 60)
@@ -195,6 +250,155 @@ async def health_check():
     }
 
 
+# ============================================================================
+# I2C REGISTER ENDPOINTS
+# ============================================================================
+class SSHConnectRequest(BaseModel):
+    host: str
+    username: str = "root"
+
+class RegisterWriteRequest(BaseModel):
+    value: int
+
+@app.get("/api/ssh/status")
+async def ssh_status():
+    """Check SSH connection status."""
+    return {
+        "connected": i2c.connected,
+        "host": i2c.host,
+    }
+
+
+@app.post("/api/ssh/connect")
+async def ssh_connect(req: SSHConnectRequest):
+    """Connect to the SOM via SSH."""
+    try:
+        await i2c.connect(req.host, username=req.username)
+        return {"status": "connected", "host": req.host}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@app.post("/api/ssh/disconnect")
+async def ssh_disconnect():
+    """Disconnect SSH."""
+    await i2c.disconnect()
+    return {"status": "disconnected"}
+
+@app.get("/api/registers")
+async def get_registers():
+    """Read all T100 register values."""
+    if not i2c.connected:
+        return {"error": "Not connected to SOM"}
+    try:
+        values = await i2c.read_all()
+        return {"registers": values}
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.get("/api/registers/info")
+async def get_register_info():
+    """Get register metadata (defaults, ranges) for the frontend."""
+    return {"registers": i2c.get_register_info()}
+
+@app.post("/api/registers/{name}")
+async def write_register(name: str, req: RegisterWriteRequest):
+    """Write a single register."""
+    if not i2c.connected:
+        return {"error": "Not connected to SOM"}
+    name = name.upper()
+    try:
+        await i2c.write_register(name, req.value)
+        # Read back to confirm
+        actual = await i2c.read_register(name)
+        return {"register": name, "written": req.value, "readback": actual}
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.post("/api/registers/defaults")
+async def restore_defaults():
+    """Restore all registers to factory defaults."""
+    if not i2c.connected:
+        return {"error": "Not connected to SOM"}
+    try:
+        results = await i2c.restore_defaults()
+        return {"registers": results}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# ============================================================================
+# SOM DEPLOY / RUN / STOP
+# ============================================================================
+DEPLOY_CMD = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    ".vscode", "deploy.cmd"
+)
+
+@app.post("/api/som/deploy-and-run")
+async def som_deploy_and_run():
+    """Deploy all repos to SOM and start dev instance."""
+    if not os.path.exists(DEPLOY_CMD):
+        return {"status": "error", "output": f"deploy.cmd not found at {DEPLOY_CMD}"}
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "cmd.exe", "/C", DEPLOY_CMD,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+        )
+        stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=120)
+        output = stdout.decode("utf-8", errors="replace")
+        if proc.returncode != 0:
+            return {"status": "error", "output": output}
+        # Now run the dev instance
+        run_proc = await asyncio.create_subprocess_exec(
+            "ssh", "som", "/tmp/hapticos-dev/run.sh",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+        )
+        run_out, _ = await asyncio.wait_for(run_proc.communicate(), timeout=30)
+        output += "\n" + run_out.decode("utf-8", errors="replace")
+        return {"status": "ok", "output": output}
+    except asyncio.TimeoutError:
+        return {"status": "error", "output": "Deploy timed out (120s)"}
+    except Exception as e:
+        return {"status": "error", "output": str(e)}
+
+@app.post("/api/som/run")
+async def som_run():
+    """Start the dev instance on SOM (assumes already deployed)."""
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "ssh", "som", "/tmp/hapticos-dev/run.sh",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+        )
+        stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=30)
+        return {"status": "ok", "output": stdout.decode("utf-8", errors="replace")}
+    except asyncio.TimeoutError:
+        return {"status": "error", "output": "Timed out (30s)"}
+    except Exception as e:
+        return {"status": "error", "output": str(e)}
+
+@app.post("/api/som/stop")
+async def som_stop():
+    """Stop the dev instance on SOM."""
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "ssh", "som", "/tmp/hapticos-dev/stop.sh",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+        )
+        stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=30)
+        return {"status": "ok", "output": stdout.decode("utf-8", errors="replace")}
+    except asyncio.TimeoutError:
+        return {"status": "error", "output": "Timed out (30s)"}
+    except Exception as e:
+        return {"status": "error", "output": str(e)}
+
+
+# ============================================================================
+# WEBSOCKET
+# ============================================================================
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     """WebSocket endpoint - streams events to frontend"""
@@ -263,9 +467,10 @@ async def websocket_endpoint(websocket: WebSocket):
 # ============================================================================
 if __name__ == "__main__":
     frozen = getattr(sys, 'frozen', False)
+    port = int(os.environ.get("PORT", 8001))
     if frozen:
         # Frozen exe can't import "main" by name — pass the app object directly
-        uvicorn.run(app, host="0.0.0.0", port=8000)
+        uvicorn.run(app, host="0.0.0.0", port=port)
     else:
         # Dev mode: string form required for reload to work
-        uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+        uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
