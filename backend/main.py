@@ -16,6 +16,10 @@ from nexus_client import NexusClient
 from nexus_signals import DoubleTap, Touch, PrintDisplay, Keystroke, SetDotMatrix
 from braille_conversion import braille_string_to_matrix
 from i2c_controller import I2CController
+from profiles import (
+    get_builtin_presets, list_profiles, load_profile,
+    save_profile, delete_profile, TouchProfile,
+)
 from serial_proxy import SerialProxy
 
 # When running as a PyInstaller bundle, sys._MEIPASS points to the temp
@@ -36,6 +40,7 @@ clients_lock = asyncio.Lock()
 nexus = None
 i2c = I2CController()
 proxy_task = None
+_xcfg_cache = None  # Cached xcfg text from SOM, refreshed on SSH connect
 
 
 # ============================================================================
@@ -291,9 +296,12 @@ async def ssh_status():
 
 @app.post("/api/ssh/connect")
 async def ssh_connect(req: SSHConnectRequest):
-    """Connect to the SOM via SSH."""
+    """Connect to the SOM via SSH and cache the xcfg file."""
+    global _xcfg_cache
     try:
         await i2c.connect(req.host, username=req.username)
+        # Cache xcfg for factory default preset
+        _xcfg_cache = await i2c.read_xcfg_file()
         return {"status": "connected", "host": req.host}
     except Exception as e:
         return {"status": "error", "message": str(e)}
@@ -306,7 +314,7 @@ async def ssh_disconnect():
 
 @app.get("/api/registers")
 async def get_registers():
-    """Read all T100 register values."""
+    """Read all register values grouped by object."""
     if not i2c.connected:
         return {"error": "Not connected to SOM"}
     try:
@@ -317,20 +325,23 @@ async def get_registers():
 
 @app.get("/api/registers/info")
 async def get_register_info():
-    """Get register metadata (defaults, ranges) for the frontend."""
+    """Get register metadata grouped by object for the frontend."""
     return {"registers": i2c.get_register_info()}
 
-@app.post("/api/registers/{name}")
-async def write_register(name: str, req: RegisterWriteRequest):
-    """Write a single register."""
+class RegisterWriteAllRequest(BaseModel):
+    registers: dict  # {"T100": {"TCHTHR": 40, ...}, "T42": {...}, ...}
+
+# IMPORTANT: Literal routes must be defined BEFORE parameterized routes
+# so FastAPI doesn't match "write-all" or "defaults" as a {name} parameter.
+
+@app.post("/api/registers/write-all")
+async def write_all_registers(req: RegisterWriteAllRequest):
+    """Write all registers from a grouped config dict."""
     if not i2c.connected:
         return {"error": "Not connected to SOM"}
-    name = name.upper()
     try:
-        await i2c.write_register(name, req.value)
-        # Read back to confirm
-        actual = await i2c.read_register(name)
-        return {"register": name, "written": req.value, "readback": actual}
+        results = await i2c.write_all(req.registers)
+        return {"registers": results}
     except Exception as e:
         return {"error": str(e)}
 
@@ -342,6 +353,149 @@ async def restore_defaults():
     try:
         results = await i2c.restore_defaults()
         return {"registers": results}
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.post("/api/registers/{obj}/{name}")
+async def write_register_scoped(obj: str, name: str, req: RegisterWriteRequest):
+    """Write a single register scoped to an object (e.g., T42/CTRL)."""
+    if not i2c.connected:
+        return {"error": "Not connected to SOM"}
+    obj = obj.upper()
+    name = name.upper()
+    try:
+        await i2c.write_register(name, req.value, obj)
+        actual = await i2c.read_register(name, obj)
+        return {"object": obj, "register": name, "written": req.value, "readback": actual}
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.post("/api/registers/{name}")
+async def write_register(name: str, req: RegisterWriteRequest):
+    """Write a single register (flat lookup, backward compatible)."""
+    if not i2c.connected:
+        return {"error": "Not connected to SOM"}
+    name = name.upper()
+    try:
+        await i2c.write_register(name, req.value)
+        actual = await i2c.read_register(name)
+        return {"register": name, "written": req.value, "readback": actual}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# ============================================================================
+# PROFILE ENDPOINTS
+# ============================================================================
+class ProfileSaveRequest(BaseModel):
+    name: str
+    description: str = ""
+    tags: list[str] = []
+    registers: dict = {}
+
+class ProfileUpdateRequest(BaseModel):
+    name: str = None
+    description: str = None
+    tags: list[str] = None
+    registers: dict = None
+
+@app.get("/api/profiles")
+async def get_profiles():
+    """List all profiles (built-in presets + saved)."""
+    builtins = get_builtin_presets(_xcfg_cache)
+    builtin_list = [
+        {
+            "filename": f"__builtin_{i}__",
+            "name": p.name,
+            "description": p.description,
+            "tags": p.tags,
+            "builtin": True,
+        }
+        for i, p in enumerate(builtins)
+    ]
+    saved = list_profiles()
+    return {"profiles": builtin_list + saved}
+
+@app.get("/api/profiles/{filename}")
+async def get_profile(filename: str):
+    """Load a specific profile."""
+    # Check if it's a built-in
+    if filename.startswith("__builtin_") and filename.endswith("__"):
+        idx = int(filename[10:-2])
+        builtins = get_builtin_presets(_xcfg_cache)
+        if 0 <= idx < len(builtins):
+            p = builtins[idx]
+            return {"profile": p.to_dict(), "builtin": True}
+        return {"error": "Built-in preset not found"}
+    try:
+        p = load_profile(filename)
+        return {"profile": p.to_dict(), "builtin": False}
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.post("/api/profiles")
+async def create_profile(req: ProfileSaveRequest):
+    """Save a new profile."""
+    profile = TouchProfile(
+        name=req.name,
+        description=req.description,
+        tags=req.tags,
+        registers=req.registers,
+    )
+    filename = save_profile(profile)
+    return {"status": "saved", "filename": filename}
+
+@app.put("/api/profiles/{filename}")
+async def update_profile(filename: str, req: ProfileUpdateRequest):
+    """Update an existing saved profile."""
+    if filename.startswith("__builtin_"):
+        return {"error": "Cannot modify built-in presets"}
+    try:
+        profile = load_profile(filename)
+        if req.name is not None:
+            profile.name = req.name
+        if req.description is not None:
+            profile.description = req.description
+        if req.tags is not None:
+            profile.tags = req.tags
+        if req.registers is not None:
+            profile.registers = req.registers
+        save_profile(profile, filename)
+        return {"status": "updated", "filename": filename}
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.delete("/api/profiles/{filename}")
+async def remove_profile(filename: str):
+    """Delete a saved profile."""
+    if filename.startswith("__builtin_"):
+        return {"error": "Cannot delete built-in presets"}
+    if delete_profile(filename):
+        return {"status": "deleted"}
+    return {"error": "Profile not found"}
+
+@app.post("/api/profiles/{filename}/apply")
+async def apply_profile(filename: str):
+    """Load a profile and write all its registers to the device."""
+    if not i2c.connected:
+        return {"error": "Not connected to SOM"}
+    # Load profile
+    if filename.startswith("__builtin_") and filename.endswith("__"):
+        idx = int(filename[10:-2])
+        builtins = get_builtin_presets(_xcfg_cache)
+        if 0 <= idx < len(builtins):
+            profile = builtins[idx]
+        else:
+            return {"error": "Built-in preset not found"}
+    else:
+        try:
+            profile = load_profile(filename)
+        except Exception as e:
+            return {"error": str(e)}
+    # Write all registers
+    try:
+        results = await i2c.write_all(profile.registers)
+        return {"status": "applied", "name": profile.name, "registers": results}
     except Exception as e:
         return {"error": str(e)}
 

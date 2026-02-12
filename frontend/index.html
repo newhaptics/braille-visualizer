@@ -14,25 +14,41 @@
     #canvas-container { display: flex; justify-content: center; padding: 10px 10px 0; }
     canvas { display: block; }
 
-    /* ── Control Panel ── */
+    /* ── Control Panel — two-column: sidebar left, registers right ── */
     #control-panel {
       background: #222; border-top: 1px solid #444; padding: 12px 20px;
-      display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start;
+      display: flex; gap: 12px; align-items: flex-start;
+    }
+    #sidebar {
+      display: flex; flex-direction: column; gap: 10px;
+      width: 240px; min-width: 240px; flex-shrink: 0;
+    }
+    #register-area {
+      flex: 1; display: flex; flex-wrap: nowrap; gap: 12px; align-items: flex-start;
+      overflow-x: auto;
     }
 
     .panel-section {
       background: #2a2a2a; border: 1px solid #3a3a3a; border-radius: 6px;
-      padding: 10px 14px; min-width: 180px;
+      padding: 10px 14px;
     }
     .panel-section h3 {
       font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px;
       color: #888; margin-bottom: 8px; font-weight: 600;
     }
 
+    /* Sidebar sections fill width */
+    #sidebar .panel-section { width: 100%; }
+
+    /* Collapsible sections */
+    .panel-section.collapsible h3 { cursor: pointer; user-select: none; }
+    .panel-section.collapsible h3::before { content: "▾ "; font-size: 10px; }
+    .panel-section.collapsible.collapsed h3::before { content: "▸ "; }
+    .panel-section.collapsible.collapsed .section-body { display: none; }
+
     /* SSH connection */
-    #ssh-section { min-width: 240px; }
     #ssh-section .row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
-    #ssh-host { flex: 1; background: #333; border: 1px solid #555; border-radius: 3px; color: #eee; padding: 4px 8px; font-size: 13px; }
+    #ssh-host { flex: 1; min-width: 0; background: #333; border: 1px solid #555; border-radius: 3px; color: #eee; padding: 4px 8px; font-size: 13px; }
     .btn {
       background: #444; border: 1px solid #666; border-radius: 3px; color: #ddd;
       padding: 4px 10px; cursor: pointer; font-size: 12px; white-space: nowrap;
@@ -41,6 +57,9 @@
     .btn.active { background: #2a6; border-color: #3b7; color: #fff; }
     .btn.danger { background: #a33; border-color: #c44; }
     .btn.danger:hover { background: #c44; }
+    .btn.primary { background: #26a; border-color: #37b; }
+    .btn.primary:hover { background: #37b; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
     #ssh-status { font-size: 11px; color: #888; }
     #ssh-status.connected { color: #4c8; }
 
@@ -74,6 +93,11 @@
       text-align: center; flex-shrink: 0; font-weight: bold;
     }
 
+    /* Checkbox register control */
+    .reg-checkbox-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .reg-checkbox-row label { display: flex; gap: 4px; align-items: center; font-size: 12px; color: #aaa; cursor: pointer; }
+    .reg-checkbox-row input[type="checkbox"] { accent-color: #6af; }
+
     /* Success flash */
     .flash {
       display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px;
@@ -84,16 +108,26 @@
     .flash.error { color: #f66; }
 
     /* Actions */
-    #actions-section { display: flex; flex-direction: column; gap: 6px; }
+    #actions-section .section-body { display: flex; flex-direction: column; gap: 6px; }
     #actions-section .btn { width: 100%; text-align: center; }
 
+    /* Profile section */
+    #profile-select { width: 100%; background: #333; border: 1px solid #555; border-radius: 3px; color: #eee; padding: 4px 8px; font-size: 12px; margin-bottom: 6px; }
+    #profile-select optgroup { color: #888; font-style: italic; }
+    #profile-select option { color: #eee; font-style: normal; }
+    .profile-btns { display: flex; gap: 4px; flex-wrap: wrap; }
+    .profile-btns .btn { flex: 1; text-align: center; min-width: 50px; }
+    .profile-desc { font-size: 11px; color: #777; margin: 4px 0; line-height: 1.3; max-height: 40px; overflow: hidden; }
+    .profile-tags { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 6px; }
+    .profile-tag { font-size: 10px; background: #383838; border: 1px solid #555; border-radius: 10px; padding: 1px 8px; color: #aaa; }
+
     /* SOM Control */
-    #som-section { display: flex; flex-direction: column; gap: 6px; }
+    #som-section .section-body { display: flex; flex-direction: column; gap: 6px; }
     #som-section .btn { width: 100%; text-align: center; }
-    .btn.primary { background: #26a; border-color: #37b; }
-    .btn.primary:hover { background: #37b; }
-    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
     #som-status { font-size: 11px; color: #888; margin-top: 2px; }
+
+    /* Register panels — all in one row, equal flex sizing */
+    #register-area .panel-section { flex: 1 1 0; min-width: 190px; }
 
     /* Amp legend */
     #amp-legend { display: flex; align-items: center; gap: 8px; font-size: 11px; }
@@ -101,128 +135,255 @@
       width: 100px; height: 10px; border-radius: 2px;
       background: linear-gradient(to right, #33f, #3ff, #3f3, #ff3, #f33);
     }
+
+    /* ── Save As Modal ── */
+    .modal-overlay {
+      display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center;
+    }
+    .modal-overlay.show { display: flex; }
+    .modal {
+      background: #2a2a2a; border: 1px solid #555; border-radius: 8px;
+      padding: 20px; width: 400px; max-width: 90%;
+    }
+    .modal h3 { color: #ddd; font-size: 16px; margin-bottom: 12px; }
+    .modal label { display: block; color: #aaa; font-size: 12px; margin-bottom: 4px; margin-top: 10px; }
+    .modal input[type="text"], .modal textarea {
+      width: 100%; background: #333; border: 1px solid #555; border-radius: 3px;
+      color: #eee; padding: 6px 8px; font-size: 13px; font-family: inherit;
+    }
+    .modal textarea { min-height: 60px; resize: vertical; }
+    .modal .modal-btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
   </style>
 </head>
 <body>
   <div id="canvas-container"></div>
 
   <div id="control-panel">
-    <!-- SSH Connection -->
-    <div class="panel-section" id="ssh-section">
-      <h3>SSH Connection</h3>
-      <div class="row">
-        <input type="text" id="ssh-host" placeholder="SOM IP (e.g. 192.168.1.100)" />
-        <button class="btn" id="ssh-connect-btn" onclick="toggleSSH()">Connect</button>
+    <!-- ── Left sidebar: connection, profiles, actions ── -->
+    <div id="sidebar">
+      <!-- SSH Connection -->
+      <div class="panel-section" id="ssh-section">
+        <h3>SSH Connection</h3>
+        <div class="row">
+          <input type="text" id="ssh-host" placeholder="SOM IP (e.g. 192.168.1.100)" />
+          <button class="btn" id="ssh-connect-btn" onclick="toggleSSH()">Connect</button>
+        </div>
+        <div id="ssh-status">Disconnected</div>
       </div>
-      <div id="ssh-status">Disconnected</div>
-    </div>
 
-    <!-- Registers: 8-bit -->
-    <div class="panel-section" id="reg-8bit-section">
-      <h3>8-bit Registers</h3>
-      <div id="reg-TCHTHR" class="reg-control">
-        <div class="reg-header">
-          <span class="reg-name" title="Touch detection threshold in 8-bit delta units. Defines how large a node's touch delta must be to register as a touch. Higher values = less sensitive, lower = more sensitive. Typical: 30-80.">TCHTHR</span>
-          <span class="reg-value" id="val-TCHTHR">—</span>
+      <!-- Profiles -->
+      <div class="panel-section" id="profile-section">
+        <h3>Profiles</h3>
+        <select id="profile-select" onchange="onProfileSelect()">
+          <option value="">— Select profile —</option>
+        </select>
+        <div id="profile-desc" class="profile-desc"></div>
+        <div id="profile-tags" class="profile-tags"></div>
+        <div class="profile-btns">
+          <button class="btn primary" onclick="applyProfile()">Apply</button>
+          <button class="btn" onclick="saveProfile()">Save</button>
+          <button class="btn" onclick="showSaveAsModal()">Save As...</button>
+          <button class="btn danger" id="profile-delete-btn" onclick="deleteProfile()" style="display:none">Del</button>
         </div>
-        <div class="reg-slider-row">
-          <button class="btn reg-btn" onclick="regStep('TCHTHR', -1)">&minus;</button>
-          <input type="range" class="reg-slider" id="slider-TCHTHR" min="0" max="255" value="40" oninput="onSlider('TCHTHR')" />
-          <button class="btn reg-btn" onclick="regStep('TCHTHR', 1)">+</button>
-          <input type="number" class="reg-input" id="input-TCHTHR" min="0" max="255" value="40" onchange="onInput('TCHTHR')" />
-        </div>
+        <span class="flash" id="profile-flash"></span>
       </div>
-      <div id="reg-TCHHYST" class="reg-control">
-        <div class="reg-header">
-          <span class="reg-name" title="Touch detection hysteresis. A touch is detected when delta >= TCHTHR, and released when delta < (TCHTHR - TCHHYST). Capped internally to 75% of TCHTHR. Recommended: <=25% of TCHTHR. 0 = no hysteresis.">TCHHYST</span>
-          <span class="reg-value" id="val-TCHHYST">—</span>
-        </div>
-        <div class="reg-slider-row">
-          <button class="btn reg-btn" onclick="regStep('TCHHYST', -1)">&minus;</button>
-          <input type="range" class="reg-slider" id="slider-TCHHYST" min="0" max="255" value="20" oninput="onSlider('TCHHYST')" />
-          <button class="btn reg-btn" onclick="regStep('TCHHYST', 1)">+</button>
-          <input type="number" class="reg-input" id="input-TCHHYST" min="0" max="255" value="20" onchange="onInput('TCHHYST')" />
-        </div>
-      </div>
-      <div id="reg-AMPLHYST" class="reg-control">
-        <div class="reg-header">
-          <span class="reg-name" title="Amplitude change hysteresis. The touch amplitude must change by more than this value before a new report is sent to the host. Prevents excessive messaging. Units: 8-bit deltas.">AMPLHYST</span>
-          <span class="reg-value" id="val-AMPLHYST">—</span>
-        </div>
-        <div class="reg-slider-row">
-          <button class="btn reg-btn" onclick="regStep('AMPLHYST', -1)">&minus;</button>
-          <input type="range" class="reg-slider" id="slider-AMPLHYST" min="0" max="255" value="0" oninput="onSlider('AMPLHYST')" />
-          <button class="btn reg-btn" onclick="regStep('AMPLHYST', 1)">+</button>
-          <input type="number" class="reg-input" id="input-AMPLHYST" min="0" max="255" value="0" onchange="onInput('AMPLHYST')" />
-        </div>
-      </div>
-    </div>
 
-    <!-- Registers: 16-bit -->
-    <div class="panel-section" id="reg-16bit-section">
-      <h3>16-bit Registers</h3>
-      <div id="reg-MOVHYSTI" class="reg-control">
-        <div class="reg-header">
-          <span class="reg-name" title="Initial movement hysteresis applied on first touchdown. The touch position must move beyond this threshold before position updates begin, allowing the host to distinguish a press from a drag. Range: 0-4095.">MOVHYSTI</span>
-          <span class="reg-value" id="val-MOVHYSTI">—</span>
-        </div>
-        <div class="reg-slider-row">
-          <button class="btn reg-btn" onclick="regStep('MOVHYSTI', -1)">&minus;</button>
-          <input type="range" class="reg-slider" id="slider-MOVHYSTI" min="0" max="4095" value="50" oninput="onSlider('MOVHYSTI')" />
-          <button class="btn reg-btn" onclick="regStep('MOVHYSTI', 1)">+</button>
-          <input type="number" class="reg-input" id="input-MOVHYSTI" min="0" max="4095" value="50" onchange="onInput('MOVHYSTI')" />
+      <!-- Actions -->
+      <div class="panel-section" id="actions-section">
+        <h3>Actions</h3>
+        <div class="section-body">
+          <button class="btn" onclick="readAllRegisters()">Read All</button>
+          <button class="btn" onclick="writeAllRegisters()">Write All</button>
+          <button class="btn danger" onclick="restoreDefaults()">Restore Defaults</button>
+          <span class="flash" id="action-flash"></span>
         </div>
       </div>
-      <div id="reg-MOVHYSTN" class="reg-control">
-        <div class="reg-header">
-          <span class="reg-name" title="Next movement hysteresis applied after initial threshold exceeded. Applied per-axis in the reverse direction of travel to suppress jitter while allowing smooth movement. Internally reduced while touch is moving. Range: 0-4095.">MOVHYSTN</span>
-          <span class="reg-value" id="val-MOVHYSTN">—</span>
+
+      <!-- SOM Control -->
+      <div class="panel-section" id="som-section">
+        <h3>SOM Control</h3>
+        <div class="section-body">
+          <button class="btn primary" id="btn-deploy-run" onclick="somDeployAndRun()">Deploy &amp; Run</button>
+          <button class="btn" id="btn-som-run" onclick="somRun()">Run Dev</button>
+          <button class="btn danger" id="btn-som-stop" onclick="somStop()">Stop Dev</button>
+          <div id="som-status"></div>
         </div>
-        <div class="reg-slider-row">
-          <button class="btn reg-btn" onclick="regStep('MOVHYSTN', -1)">&minus;</button>
-          <input type="range" class="reg-slider" id="slider-MOVHYSTN" min="0" max="4095" value="10" oninput="onSlider('MOVHYSTN')" />
-          <button class="btn reg-btn" onclick="regStep('MOVHYSTN', 1)">+</button>
-          <input type="number" class="reg-input" id="input-MOVHYSTN" min="0" max="4095" value="10" onchange="onInput('MOVHYSTN')" />
+      </div>
+
+      <!-- Amp Legend -->
+      <div class="panel-section">
+        <h3>Touch Amplitude</h3>
+        <div id="amp-legend">
+          <span>0</span>
+          <div id="amp-gradient"></div>
+          <span>100+</span>
         </div>
       </div>
     </div>
 
-    <!-- Actions -->
-    <div class="panel-section" id="actions-section">
-      <h3>Actions</h3>
-      <button class="btn" onclick="readAllRegisters()">Read All</button>
-      <button class="btn" onclick="writeAllRegisters()">Write All</button>
-      <button class="btn danger" onclick="restoreDefaults()">Restore Defaults</button>
-      <span class="flash" id="action-flash"></span>
-    </div>
+    <!-- ── Right area: register panels ── -->
+    <div id="register-area">
+      <!-- T100 Registers (multi-column) -->
+      <div class="panel-section collapsible" id="t100-section">
+        <h3 onclick="toggleSection(this)">T100 — Touch Detection</h3>
+        <div class="section-body" id="t100-body"></div>
+      </div>
 
-    <!-- SOM Control -->
-    <div class="panel-section" id="som-section">
-      <h3>SOM Control</h3>
-      <button class="btn primary" id="btn-deploy-run" onclick="somDeployAndRun()">Deploy &amp; Run</button>
-      <button class="btn" id="btn-som-run" onclick="somRun()">Run Dev</button>
-      <button class="btn danger" id="btn-som-stop" onclick="somStop()">Stop Dev</button>
-      <div id="som-status"></div>
-    </div>
+      <!-- T42 Registers (same width as T100) -->
+      <div class="panel-section collapsible" id="t42-section">
+        <h3 onclick="toggleSection(this)">T42 — Touch Suppression</h3>
+        <div class="section-body" id="t42-body"></div>
+      </div>
 
-    <!-- Amp Legend -->
-    <div class="panel-section">
-      <h3>Touch Amplitude</h3>
-      <div id="amp-legend">
-        <span>0</span>
-        <div id="amp-gradient"></div>
-        <span>100+</span>
+      <!-- T8 Registers -->
+      <div class="panel-section collapsible collapsed" id="t8-section">
+        <h3 onclick="toggleSection(this)">T8 — Acquisition</h3>
+        <div class="section-body" id="t8-body"></div>
+      </div>
+
+      <!-- T40 Registers -->
+      <div class="panel-section collapsible collapsed" id="t40-section">
+        <h3 onclick="toggleSection(this)">T40 — Grip Suppression</h3>
+        <div class="section-body" id="t40-body"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Save As Modal -->
+  <div class="modal-overlay" id="save-as-modal">
+    <div class="modal">
+      <h3>Save Profile As</h3>
+      <label for="save-as-name">Name *</label>
+      <input type="text" id="save-as-name" placeholder="My Custom Config" />
+      <label for="save-as-desc">Description</label>
+      <textarea id="save-as-desc" placeholder="Describe what this configuration is for..."></textarea>
+      <label for="save-as-tags">Tags (comma-separated)</label>
+      <input type="text" id="save-as-tags" placeholder="edge-fix, testing" />
+      <div class="modal-btns">
+        <button class="btn" onclick="closeSaveAsModal()">Cancel</button>
+        <button class="btn primary" onclick="doSaveAs()">Save</button>
       </div>
     </div>
   </div>
 
   <script>
+    // ── Register metadata — fetched from backend on load ──
+    let REG_INFO = {};  // { "T100": { "TCHTHR": { min, max, default, description }, ... }, ... }
+    const OBJ_ORDER = ["T100", "T42", "T8", "T40"];
+
+    // T42 CTRL bit definitions
+    const T42_CTRL_BITS = [
+      { bit: 0, label: "Enable", desc: "Enable touch suppression" },
+      { bit: 1, label: "EdgeSup", desc: "Enable edge-based suppression for touches near sensor edges" },
+      { bit: 2, label: "ShapeSup", desc: "Enable shape-based suppression for non-finger objects" },
+      { bit: 3, label: "SupDistEn", desc: "Enable distance suppression — suppress touches near a suppressed object" },
+      { bit: 4, label: "DistLock", desc: "Lock distance suppression region once triggered" },
+    ];
+    const T40_CTRL_BITS = [
+      { bit: 0, label: "Enable", desc: "Enable grip suppression to filter touches at sensor boundaries" },
+    ];
+
+    // ── Collapsible sections ──
+    function toggleSection(h3) {
+      h3.parentElement.classList.toggle("collapsed");
+    }
+
+    // ── Build register controls dynamically ──
+    async function buildRegisterControls() {
+      try {
+        const res = await fetch(API_BASE + "/api/registers/info");
+        const data = await res.json();
+        REG_INFO = data.registers || {};
+      } catch (e) {
+        console.error("Failed to fetch register info:", e);
+        return;
+      }
+
+      for (const obj of OBJ_ORDER) {
+        const info = REG_INFO[obj];
+        if (!info) continue;
+        const body = document.getElementById(obj.toLowerCase() + "-body");
+        if (!body) continue;
+        body.innerHTML = "";
+
+        for (const [name, meta] of Object.entries(info)) {
+          // Special handling for T42 CTRL and T40 CTRL — show checkboxes
+          if ((obj === "T42" || obj === "T40") && name === "CTRL") {
+            body.appendChild(buildCtrlCheckboxes(obj, name, meta));
+          } else {
+            body.appendChild(buildSliderControl(obj, name, meta));
+          }
+        }
+      }
+    }
+
+    function buildSliderControl(obj, name, meta) {
+      const id = obj + "-" + name;
+      const div = document.createElement("div");
+      div.className = "reg-control";
+      div.innerHTML = `
+        <div class="reg-header">
+          <span class="reg-name" title="${meta.description || ''}">${name}</span>
+          <span class="reg-value" id="val-${id}">—</span>
+        </div>
+        <div class="reg-slider-row">
+          <button class="btn reg-btn" onclick="regStep('${id}', -1)">&minus;</button>
+          <input type="range" class="reg-slider" id="slider-${id}" min="${meta.min}" max="${meta.max}" value="${meta.default}" oninput="onSlider('${id}')" onchange="writeOneRegister('${obj}','${name}','${id}')" />
+          <button class="btn reg-btn" onclick="regStep('${id}', 1)">+</button>
+          <input type="number" class="reg-input" id="input-${id}" min="${meta.min}" max="${meta.max}" value="${meta.default}" onchange="onInput('${id}'); writeOneRegister('${obj}','${name}','${id}')" />
+        </div>`;
+      return div;
+    }
+
+    function buildCtrlCheckboxes(obj, name, meta) {
+      const id = obj + "-" + name;
+      const bits = obj === "T42" ? T42_CTRL_BITS : T40_CTRL_BITS;
+      const div = document.createElement("div");
+      div.className = "reg-control";
+      let checkboxHtml = bits.map(b =>
+        `<label title="${b.desc}"><input type="checkbox" id="chk-${id}-${b.bit}" onchange="onCtrlCheckbox('${obj}','${id}')" /> ${b.label}</label>`
+      ).join("");
+      div.innerHTML = `
+        <div class="reg-header">
+          <span class="reg-name" title="${meta.description || ''}">CTRL</span>
+          <span class="reg-value" id="val-${id}">—</span>
+        </div>
+        <div class="reg-checkbox-row">${checkboxHtml}</div>`;
+      // Hidden slider/input for value tracking
+      const hidden = document.createElement("input");
+      hidden.type = "hidden"; hidden.id = "input-" + id; hidden.value = meta.default;
+      div.appendChild(hidden);
+      return div;
+    }
+
+    function onCtrlCheckbox(obj, id) {
+      // Reconstruct byte from checkboxes
+      let val = 0;
+      for (let bit = 0; bit < 8; bit++) {
+        const chk = document.getElementById("chk-" + id + "-" + bit);
+        if (chk && chk.checked) val |= (1 << bit);
+      }
+      document.getElementById("input-" + id).value = val;
+      document.getElementById("val-" + id).textContent = val;
+      writeOneRegister(obj, "CTRL", id);
+    }
+
+    function setCtrlCheckboxes(id, val) {
+      for (let bit = 0; bit < 8; bit++) {
+        const chk = document.getElementById("chk-" + id + "-" + bit);
+        if (chk) chk.checked = !!(val & (1 << bit));
+      }
+      document.getElementById("input-" + id).value = val;
+      document.getElementById("val-" + id).textContent = val;
+    }
+
     // ── SSH Connection with auto-connect ──
     let sshConnected = false;
     const SSH_STORAGE_KEY = "touch-tuning-ssh-host";
 
-    // Restore last host and auto-connect on load
-    window.addEventListener("DOMContentLoaded", () => {
+    window.addEventListener("DOMContentLoaded", async () => {
+      await buildRegisterControls();
       const saved = localStorage.getItem(SSH_STORAGE_KEY);
       if (saved) {
         document.getElementById("ssh-host").value = saved;
@@ -244,7 +405,10 @@
         });
         const data = await res.json();
         sshConnected = data.status === "connected";
-        if (sshConnected) readAllRegisters();
+        if (sshConnected) {
+          readAllRegisters();
+          loadProfiles();
+        }
       } catch (e) {
         console.error("SSH auto-connect failed:", e);
       }
@@ -260,7 +424,6 @@
       } else {
         const host = document.getElementById("ssh-host").value.trim();
         if (!host) { alert("Enter SOM IP address"); return; }
-        // Save for next time
         localStorage.setItem(SSH_STORAGE_KEY, host);
         await autoConnect(host);
       }
@@ -283,34 +446,125 @@
     }
 
     // ── Register Controls ──
-    const REG_NAMES = ["TCHTHR", "TCHHYST", "MOVHYSTI", "MOVHYSTN", "AMPLHYST"];
-
-    function onSlider(name) {
-      const val = document.getElementById("slider-" + name).value;
-      document.getElementById("input-" + name).value = val;
+    function onSlider(id) {
+      const val = document.getElementById("slider-" + id).value;
+      document.getElementById("input-" + id).value = val;
     }
 
-    function onInput(name) {
-      const val = document.getElementById("input-" + name).value;
-      const slider = document.getElementById("slider-" + name);
-      slider.value = Math.min(val, parseInt(slider.max));
+    function onInput(id) {
+      const val = document.getElementById("input-" + id).value;
+      const slider = document.getElementById("slider-" + id);
+      if (slider) slider.value = Math.min(val, parseInt(slider.max));
     }
 
-    function regStep(name, dir) {
-      const slider = document.getElementById("slider-" + name);
-      const input = document.getElementById("input-" + name);
-      let val = parseInt(slider.value) + dir;
-      val = Math.max(parseInt(slider.min), Math.min(parseInt(slider.max), val));
-      slider.value = val;
+    function regStep(id, dir) {
+      const slider = document.getElementById("slider-" + id);
+      const input = document.getElementById("input-" + id);
+      let val = parseInt(input.value) + dir;
+      if (slider) val = Math.max(parseInt(slider.min), Math.min(parseInt(slider.max), val));
+      if (slider) slider.value = val;
       input.value = val;
+      // id is "T100-TCHTHR" etc — split to get obj and name
+      const [obj, ...rest] = id.split("-");
+      const name = rest.join("-");
+      writeOneRegister(obj, name, id);
     }
 
-    function showFlash(msg, type) {
-      const el = document.getElementById("action-flash");
+    async function writeOneRegister(obj, name, id) {
+      if (!sshConnected) return;
+      const input = document.getElementById("input-" + id);
+      if (!input) return;
+      const val = parseInt(input.value) || 0;
+      const valEl = document.getElementById("val-" + id);
+      if (valEl) valEl.textContent = val;
+      try {
+        const res = await fetch(API_BASE + "/api/registers/" + obj + "/" + name, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ value: val })
+        });
+        const data = await res.json();
+        if (data.readback !== undefined) {
+          if (valEl) valEl.textContent = data.readback;
+          // Update device state tracker
+          if (!deviceState[obj]) deviceState[obj] = {};
+          deviceState[obj][name] = data.readback;
+        }
+      } catch (e) {
+        console.error("Write " + obj + "." + name + " failed:", e);
+      }
+    }
+
+    function showFlash(elId, msg, type) {
+      const el = document.getElementById(elId);
       el.textContent = msg;
       el.className = "flash " + type + " show";
       clearTimeout(el._timer);
       el._timer = setTimeout(() => { el.classList.remove("show"); }, 2000);
+    }
+
+    // Track last-known device state for diff-based writes
+    let deviceState = {};
+
+    function snapshotDeviceState(regs) {
+      deviceState = JSON.parse(JSON.stringify(regs));
+    }
+
+    function getChangedRegisters() {
+      const current = getAllControlValues();
+      const changed = {};
+      let count = 0;
+      for (const obj of OBJ_ORDER) {
+        if (!current[obj]) continue;
+        for (const [name, val] of Object.entries(current[obj])) {
+          const devVal = deviceState[obj] && deviceState[obj][name];
+          if (devVal === undefined || val !== devVal) {
+            if (!changed[obj]) changed[obj] = {};
+            changed[obj][name] = val;
+            count++;
+          }
+        }
+      }
+      return { changed, count };
+    }
+
+    // Get all current control values as grouped dict
+    function getAllControlValues() {
+      const result = {};
+      for (const obj of OBJ_ORDER) {
+        const info = REG_INFO[obj];
+        if (!info) continue;
+        result[obj] = {};
+        for (const name of Object.keys(info)) {
+          const id = obj + "-" + name;
+          const input = document.getElementById("input-" + id);
+          if (input) result[obj][name] = parseInt(input.value) || 0;
+        }
+      }
+      return result;
+    }
+
+    // Set all control values from grouped dict
+    function setAllControlValues(regs) {
+      for (const obj of OBJ_ORDER) {
+        const objRegs = regs[obj];
+        if (!objRegs) continue;
+        for (const [name, val] of Object.entries(objRegs)) {
+          if (typeof val !== "number") continue;
+          const id = obj + "-" + name;
+          // Check if this is a CTRL checkbox field
+          if (name === "CTRL" && (obj === "T42" || obj === "T40")) {
+            setCtrlCheckboxes(id, val);
+          } else {
+            const valEl = document.getElementById("val-" + id);
+            const slider = document.getElementById("slider-" + id);
+            const input = document.getElementById("input-" + id);
+            if (valEl) valEl.textContent = val;
+            if (slider) slider.value = Math.min(val, parseInt(slider.max));
+            if (input) input.value = val;
+          }
+        }
+      }
     }
 
     async function readAllRegisters() {
@@ -319,48 +573,236 @@
         const res = await fetch(API_BASE + "/api/registers");
         const data = await res.json();
         if (data.registers) {
-          for (const name of REG_NAMES) {
-            const val = data.registers[name];
-            if (typeof val === "number") {
-              document.getElementById("val-" + name).textContent = val;
-              document.getElementById("slider-" + name).value = Math.min(val, parseInt(document.getElementById("slider-" + name).max));
-              document.getElementById("input-" + name).value = val;
-            }
-          }
-          showFlash("Success", "success");
+          setAllControlValues(data.registers);
+          snapshotDeviceState(data.registers);
+          showFlash("action-flash", "Read OK", "success");
         }
       } catch (e) {
         console.error("Read registers failed:", e);
-        showFlash("Read failed", "error");
-      }
-    }
-
-    async function writeRegister(name) {
-      if (!sshConnected) return;
-      const val = parseInt(document.getElementById("input-" + name).value);
-      try {
-        const res = await fetch(API_BASE + "/api/registers/" + name, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ value: val })
-        });
-        const data = await res.json();
-        if (data.readback !== undefined) {
-          document.getElementById("val-" + name).textContent = data.readback;
-        }
-      } catch (e) {
-        console.error("Write register failed:", e);
+        showFlash("action-flash", "Read failed", "error");
       }
     }
 
     async function writeAllRegisters() {
+      if (!sshConnected) return;
+      const { changed, count } = getChangedRegisters();
+      if (count === 0) {
+        showFlash("action-flash", "No changes", "success");
+        return;
+      }
       try {
-        for (const name of REG_NAMES) {
-          await writeRegister(name);
+        const res = await fetch(API_BASE + "/api/registers/write-all", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ registers: changed })
+        });
+        const data = await res.json();
+        if (data.registers) {
+          // Merge written values into device state
+          for (const [obj, regs] of Object.entries(data.registers)) {
+            if (!deviceState[obj]) deviceState[obj] = {};
+            Object.assign(deviceState[obj], regs);
+          }
+          showFlash("action-flash", count + " written", "success");
+        } else {
+          showFlash("action-flash", data.error || "Write failed", "error");
         }
-        showFlash("Written", "success");
       } catch (e) {
-        showFlash("Write failed", "error");
+        showFlash("action-flash", "Write failed", "error");
+      }
+    }
+
+    async function restoreDefaults() {
+      if (!sshConnected) return;
+      try {
+        const res = await fetch(API_BASE + "/api/registers/defaults", { method: "POST" });
+        const data = await res.json();
+        if (data.registers) {
+          setAllControlValues(data.registers);
+          snapshotDeviceState(data.registers);
+          showFlash("action-flash", "Defaults restored", "success");
+        }
+      } catch (e) {
+        console.error("Restore defaults failed:", e);
+        showFlash("action-flash", "Restore failed", "error");
+      }
+    }
+
+    // ── Profiles ──
+    let profilesList = [];  // [{filename, name, description, tags, builtin}, ...]
+
+    async function loadProfiles() {
+      try {
+        const res = await fetch(API_BASE + "/api/profiles");
+        const data = await res.json();
+        profilesList = data.profiles || [];
+        renderProfileSelect();
+      } catch (e) {
+        console.error("Failed to load profiles:", e);
+      }
+    }
+
+    function renderProfileSelect() {
+      const sel = document.getElementById("profile-select");
+      sel.innerHTML = '<option value="">— Select profile —</option>';
+
+      const builtins = profilesList.filter(p => p.builtin);
+      const saved = profilesList.filter(p => !p.builtin);
+
+      if (builtins.length) {
+        const grp = document.createElement("optgroup");
+        grp.label = "Built-in Presets";
+        for (const p of builtins) {
+          const opt = document.createElement("option");
+          opt.value = p.filename;
+          opt.textContent = p.name;
+          grp.appendChild(opt);
+        }
+        sel.appendChild(grp);
+      }
+
+      if (saved.length) {
+        const grp = document.createElement("optgroup");
+        grp.label = "Saved Profiles";
+        for (const p of saved) {
+          const opt = document.createElement("option");
+          opt.value = p.filename;
+          opt.textContent = p.name;
+          grp.appendChild(opt);
+        }
+        sel.appendChild(grp);
+      }
+    }
+
+    function onProfileSelect() {
+      const sel = document.getElementById("profile-select");
+      const filename = sel.value;
+      const profile = profilesList.find(p => p.filename === filename);
+      const descEl = document.getElementById("profile-desc");
+      const tagsEl = document.getElementById("profile-tags");
+      const delBtn = document.getElementById("profile-delete-btn");
+
+      if (profile) {
+        descEl.textContent = profile.description || "";
+        tagsEl.innerHTML = (profile.tags || []).map(t => `<span class="profile-tag">${t}</span>`).join("");
+        delBtn.style.display = profile.builtin ? "none" : "";
+      } else {
+        descEl.textContent = "";
+        tagsEl.innerHTML = "";
+        delBtn.style.display = "none";
+      }
+    }
+
+    async function applyProfile() {
+      const filename = document.getElementById("profile-select").value;
+      if (!filename) { alert("Select a profile first"); return; }
+      if (!sshConnected) { alert("Connect to SOM first"); return; }
+
+      try {
+        // First fetch the profile to get register values for the UI
+        const profileRes = await fetch(API_BASE + "/api/profiles/" + encodeURIComponent(filename));
+        const profileData = await profileRes.json();
+        if (profileData.profile && profileData.profile.registers) {
+          setAllControlValues(profileData.profile.registers);
+        }
+
+        // Then apply to device
+        const res = await fetch(API_BASE + "/api/profiles/" + encodeURIComponent(filename) + "/apply", { method: "POST" });
+        const data = await res.json();
+        if (data.status === "applied") {
+          snapshotDeviceState(getAllControlValues());
+          showFlash("profile-flash", "Applied: " + data.name, "success");
+        } else {
+          showFlash("profile-flash", data.error || "Apply failed", "error");
+        }
+      } catch (e) {
+        showFlash("profile-flash", "Apply failed", "error");
+      }
+    }
+
+    async function saveProfile() {
+      const filename = document.getElementById("profile-select").value;
+      if (!filename || filename.startsWith("__builtin_")) {
+        showSaveAsModal();
+        return;
+      }
+      const regs = getAllControlValues();
+      try {
+        const res = await fetch(API_BASE + "/api/profiles/" + encodeURIComponent(filename), {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ registers: regs })
+        });
+        const data = await res.json();
+        if (data.status === "updated") {
+          showFlash("profile-flash", "Saved", "success");
+        } else {
+          showFlash("profile-flash", data.error || "Save failed", "error");
+        }
+      } catch (e) {
+        showFlash("profile-flash", "Save failed", "error");
+      }
+    }
+
+    function showSaveAsModal() {
+      document.getElementById("save-as-name").value = "";
+      document.getElementById("save-as-desc").value = "";
+      document.getElementById("save-as-tags").value = "";
+      document.getElementById("save-as-modal").classList.add("show");
+      document.getElementById("save-as-name").focus();
+    }
+
+    function closeSaveAsModal() {
+      document.getElementById("save-as-modal").classList.remove("show");
+    }
+
+    async function doSaveAs() {
+      const name = document.getElementById("save-as-name").value.trim();
+      if (!name) { alert("Name is required"); return; }
+      const description = document.getElementById("save-as-desc").value.trim();
+      const tagsStr = document.getElementById("save-as-tags").value.trim();
+      const tags = tagsStr ? tagsStr.split(",").map(t => t.trim()).filter(Boolean) : [];
+      const registers = getAllControlValues();
+
+      try {
+        const res = await fetch(API_BASE + "/api/profiles", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, description, tags, registers })
+        });
+        const data = await res.json();
+        if (data.status === "saved") {
+          closeSaveAsModal();
+          await loadProfiles();
+          // Select the newly saved profile
+          document.getElementById("profile-select").value = data.filename;
+          onProfileSelect();
+          showFlash("profile-flash", "Saved: " + name, "success");
+        } else {
+          alert(data.error || "Save failed");
+        }
+      } catch (e) {
+        alert("Save failed: " + e.message);
+      }
+    }
+
+    async function deleteProfile() {
+      const filename = document.getElementById("profile-select").value;
+      if (!filename || filename.startsWith("__builtin_")) return;
+      const profile = profilesList.find(p => p.filename === filename);
+      if (!confirm("Delete profile \"" + (profile?.name || filename) + "\"?")) return;
+
+      try {
+        const res = await fetch(API_BASE + "/api/profiles/" + encodeURIComponent(filename), { method: "DELETE" });
+        const data = await res.json();
+        if (data.status === "deleted") {
+          await loadProfiles();
+          showFlash("profile-flash", "Deleted", "success");
+        } else {
+          showFlash("profile-flash", data.error || "Delete failed", "error");
+        }
+      } catch (e) {
+        showFlash("profile-flash", "Delete failed", "error");
       }
     }
 
@@ -413,27 +855,10 @@
       setSomButtonsDisabled(false);
     }
 
-    async function restoreDefaults() {
-      if (!sshConnected) return;
-      try {
-        const res = await fetch(API_BASE + "/api/registers/defaults", { method: "POST" });
-        const data = await res.json();
-        if (data.registers) {
-          for (const name of REG_NAMES) {
-            const val = data.registers[name];
-            if (typeof val === "number") {
-              document.getElementById("val-" + name).textContent = val;
-              document.getElementById("slider-" + name).value = Math.min(val, parseInt(document.getElementById("slider-" + name).max));
-              document.getElementById("input-" + name).value = val;
-            }
-          }
-          showFlash("Defaults restored", "success");
-        }
-      } catch (e) {
-        console.error("Restore defaults failed:", e);
-        showFlash("Restore failed", "error");
-      }
-    }
+    // Close modal on Escape
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") closeSaveAsModal();
+    });
   </script>
 </body>
 </html>
