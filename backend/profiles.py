@@ -297,5 +297,31 @@ def get_builtin_presets(xcfg_text: str = None) -> list[TouchProfile]:
 			},
 			builtin=True,
 		),
+		TouchProfile(
+			name="High Sensitivity + Edge Suppression",
+			description="Combines low touch threshold for maximum sensitivity with T42 edge suppression to filter phantom touches at sensor boundaries. Good starting point for production tuning.",
+			tags=["sensitive", "edge", "suppression", "recommended"],
+			registers={
+				"T100": {
+					"TCHTHR": 25, "TCHHYST": 6, "INTTHR": 10, "INTTHRHYST": 2,
+					"TCHDIDOWN": 2, "TCHDIUP": 1, "NEXTTCHDI": 1,
+					"MOVHYSTI": 30, "MOVHYSTN": 5, "AMPLHYST": 0,
+					"XEDGECFG": 0, "XEDGEDIST": 0, "YEDGECFG": 0, "YEDGEDIST": 0,
+				},
+				"T42": {
+					"CTRL": 3, "MAXAPPRAREA": 0, "MAXTCHAREA": 0, "SUPSTRENGTH": 0,
+					"SUPEXTTO": 5, "MAXNUMTCHS": 0, "SHAPESTRENGTH": 0,
+					"SUPDIST": 0, "DISTHYST": 0, "MAXSCRNAREA": 0, "EDGESUPSTRENGTH": 73,
+				},
+				"T8": {
+					"TCHAUTOCAL": 0, "ATCHCALST": 0, "ATCHCALSTHR": 0,
+					"ATCHFRCCALTHR": 50, "ATCHFRCCALRATIO": 25,
+				},
+				"T40": {
+					"CTRL": 0, "XLOGRIP": 0, "XHIGRIP": 0, "YLOGRIP": 0, "YHIGRIP": 0,
+				},
+			},
+			builtin=True,
+		),
 	]
 	return presets

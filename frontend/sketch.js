@@ -11,6 +11,37 @@ let dotMatrix = [];
 let doubleTaps = [];
 let fingers = {};
 
+// ── Braille-to-Latin lookup (Grade 1 UEB) ──
+const B2L = {};
+(function(){
+  const letters = 'a b c d e f g h i j k l m n o p q r s t u v w x y z'.split(' ');
+  const codes = [1,3,9,25,17,11,27,19,10,26,5,7,13,29,21,15,31,23,14,30,37,39,58,45,61,53];
+  codes.forEach((c,i) => B2L[c] = letters[i]);
+  const nums = '1 2 3 4 5 6 7 8 9 0'.split(' ');
+  const ncodes = [1,3,9,25,17,11,27,19,10,26];
+  ncodes.forEach((c,i) => B2L[c + 0x20] = nums[i]);
+  B2L[0] = ' '; B2L[2] = ','; B2L[50] = '.'; B2L[18] = ';'; B2L[34] = ':';
+  B2L[6] = '!'; B2L[38] = '?'; B2L[36] = '-'; B2L[4] = "'";
+  B2L[44] = '#'; B2L[32] = '_'; B2L[48] = '_';
+  B2L[0xFF] = '#'; B2L[0xF8] = '|'; B2L[0xE0] = '|';
+})();
+
+function brToLatin(s) {
+  let out = '', cap = false;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s.charCodeAt(i);
+    if (ch < 0x2800 || ch > 0x28FF) { out += s[i]; cap = false; continue; }
+    const code = ch - 0x2800;
+    if (code === 0) { out += ' '; continue; }
+    if (code === 32) { cap = true; continue; }  // capital indicator
+    if (code === 44 || code === 60) { continue; }  // number indicator, letter indicator
+    const l = B2L[code];
+    if (l) { if (cap) { out += l.toUpperCase(); cap = false; } else out += l; }
+    else { out += String.fromCharCode(ch); }
+  }
+  return out;
+}
+
 // connect to WebSocket server from config.js
 let socket;
 
@@ -47,6 +78,12 @@ function handleMessage(event) {
 
   if (msg.type == "matrix") {
     dotMatrix = msg.mat;
+    // Update Latin text display if braille string is included
+    if (msg.braille !== undefined) {
+      const lines = msg.braille.split('\n');
+      const latinEl = document.getElementById('latin-content');
+      if (latinEl) latinEl.textContent = lines.map(l => brToLatin(l)).join('\n');
+    }
   }
 
   else if (msg.type == "touch") {

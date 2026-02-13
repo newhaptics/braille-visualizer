@@ -1,0 +1,52 @@
+{
+  "name": "Edge Supp + High Sensitivity V1",
+  "description": "Custom formulation to avoid phantom taps along edge",
+  "tags": [],
+  "created": "2026-02-12T14:24:14",
+  "modified": "2026-02-12T14:24:14",
+  "registers": {
+    "T100": {
+      "TCHTHR": 40,
+      "TCHHYST": 10,
+      "INTTHR": 20,
+      "INTTHRHYST": 4,
+      "TCHDIDOWN": 4,
+      "TCHDIUP": 2,
+      "NEXTTCHDI": 2,
+      "MOVHYSTI": 15,
+      "MOVHYSTN": 7,
+      "AMPLHYST": 0,
+      "XEDGECFG": 0,
+      "XEDGEDIST": 0,
+      "YEDGECFG": 0,
+      "YEDGEDIST": 0
+    },
+    "T42": {
+      "CTRL": 3,
+      "MAXAPPRAREA": 0,
+      "MAXTCHAREA": 0,
+      "SUPSTRENGTH": 0,
+      "SUPEXTTO": 5,
+      "MAXNUMTCHS": 0,
+      "SHAPESTRENGTH": 0,
+      "SUPDIST": 0,
+      "DISTHYST": 0,
+      "MAXSCRNAREA": 0,
+      "EDGESUPSTRENGTH": 73
+    },
+    "T8": {
+      "TCHAUTOCAL": 0,
+      "ATCHCALST": 0,
+      "ATCHCALSTHR": 0,
+      "ATCHFRCCALTHR": 50,
+      "ATCHFRCCALRATIO": 25
+    },
+    "T40": {
+      "CTRL": 0,
+      "XLOGRIP": 0,
+      "XHIGRIP": 0,
+      "YLOGRIP": 0,
+      "YHIGRIP": 0
+    }
+  }
+}

@@ -19,6 +19,19 @@ from typing import Optional
 I2C_BUS = 1
 MAXTOUCH_I2C_ADDR = 0x4A
 
+# Cross-process I2C lock file (must match hapticos-bios i2c.py)
+I2C_LOCK_PATH = "/tmp/hapticos-i2c-bus1.lock"
+
+# Lock preamble/postamble injected into every SSH I2C script
+_LOCK_PRE = (
+	f"import fcntl,os; "
+	f"_lfd=os.open('{I2C_LOCK_PATH}',os.O_CREAT|os.O_RDWR,0o666); "
+	f"fcntl.flock(_lfd,fcntl.LOCK_EX); "
+)
+_LOCK_POST = (
+	f"fcntl.flock(_lfd,fcntl.LOCK_UN); os.close(_lfd)"
+)
+
 # Object base addresses (from device object table)
 T8_BASE_ADDR = 1007   # GEN_ACQUISITIONCONFIG
 T40_BASE_ADDR = 1058  # PROCI_GRIPSUPPRESSION
@@ -147,13 +160,15 @@ def _build_read_script(reg: RegisterDef) -> str:
 	"""Build a Python one-liner to read a register on the SOM."""
 	lo, hi = reg.addr_bytes
 	return (
+		_LOCK_PRE +
 		f"from smbus2 import SMBus, i2c_msg; "
 		f"bus=SMBus({I2C_BUS}); "
 		f"bus.i2c_rdwr(i2c_msg.write({MAXTOUCH_I2C_ADDR}, [{lo}, {hi}])); "
 		f"r=i2c_msg.read({MAXTOUCH_I2C_ADDR}, {reg.size}); "
 		f"bus.i2c_rdwr(r); "
 		f"import json; print(json.dumps(list(r))); "
-		f"bus.close()"
+		f"bus.close(); " +
+		_LOCK_POST
 	)
 
 
@@ -166,11 +181,13 @@ def _build_write_script(reg: RegisterDef, value: int) -> str:
 		# 16-bit little-endian
 		data_bytes = f"{value & 0xFF}, {(value >> 8) & 0xFF}"
 	return (
+		_LOCK_PRE +
 		f"from smbus2 import SMBus, i2c_msg; "
 		f"bus=SMBus({I2C_BUS}); "
 		f"bus.i2c_rdwr(i2c_msg.write({MAXTOUCH_I2C_ADDR}, [{lo}, {hi}, {data_bytes}])); "
 		f"bus.close(); "
-		f"print('ok')"
+		f"print('ok'); " +
+		_LOCK_POST
 	)
 
 
@@ -281,8 +298,9 @@ class I2CController:
 		raise ValueError(f"Unknown register: {name}")
 
 	async def read_all(self) -> dict:
-		"""Read all registers in a single SSH command (batched)."""
+		"""Read all registers in a single SSH command (batched, locked)."""
 		lines = [
+			f"import fcntl,os; _lfd=os.open('{I2C_LOCK_PATH}',os.O_CREAT|os.O_RDWR,0o666); fcntl.flock(_lfd,fcntl.LOCK_EX)",
 			"from smbus2 import SMBus, i2c_msg; import json",
 			f"bus=SMBus({I2C_BUS}); r={{}}",
 		]
@@ -298,13 +316,15 @@ class I2CController:
 					+ (f"d[0]" if reg.size == 1 else f"d[0]|d[1]<<8")
 				)
 		lines.append("bus.close(); print(json.dumps(r))")
+		lines.append("fcntl.flock(_lfd,fcntl.LOCK_UN); os.close(_lfd)")
 		script = "; ".join(lines)
 		raw = await self._exec(script)
 		return json.loads(raw.strip())
 
 	async def write_all(self, config: dict) -> dict:
-		"""Write registers in a single SSH command (batched)."""
+		"""Write registers in a single SSH command (batched, locked)."""
 		lines = [
+			f"import fcntl,os; _lfd=os.open('{I2C_LOCK_PATH}',os.O_CREAT|os.O_RDWR,0o666); fcntl.flock(_lfd,fcntl.LOCK_EX)",
 			"from smbus2 import SMBus, i2c_msg; import json",
 			f"bus=SMBus({I2C_BUS}); r={{}}",
 		]
@@ -328,6 +348,7 @@ class I2CController:
 					f"r['{obj}']['{name}']={value}"
 				)
 		lines.append("bus.close(); print(json.dumps(r))")
+		lines.append("fcntl.flock(_lfd,fcntl.LOCK_UN); os.close(_lfd)")
 		script = "; ".join(lines)
 		raw = await self._exec(script)
 		return json.loads(raw.strip())

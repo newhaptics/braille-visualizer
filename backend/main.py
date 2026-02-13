@@ -70,10 +70,11 @@ async def on_printdisplay(payload):
         # Convert braille string to 20×96 matrix
         matrix = braille_string_to_matrix(pd.string)
 
-        # Send matrix to frontend
+        # Send matrix + raw braille text to frontend
         event = {
             'type': 'matrix',
-            'mat': matrix
+            'mat': matrix,
+            'braille': pd.string,
         }
         try:
             events.put_nowait(event)
