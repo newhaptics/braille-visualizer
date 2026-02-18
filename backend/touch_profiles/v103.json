@@ -1,0 +1,69 @@
+{
+  "name": "V1.0.3",
+  "description": "Edge suppression back on with SUP strength and SUP EXT TO adjusted to fix problems with coming in off the edge.",
+  "tags": [],
+  "created": "2026-02-17T16:46:06",
+  "modified": "2026-02-17T17:06:00",
+  "registers": {
+    "T100": {
+      "TCHTHR": 30,
+      "TCHHYST": 8,
+      "INTTHR": 10,
+      "INTTHRHYST": 2,
+      "TCHDIDOWN": 2,
+      "TCHDIUP": 1,
+      "NEXTTCHDI": 1,
+      "MOVHYSTI": 1,
+      "MOVHYSTN": 1,
+      "AMPLHYST": 7,
+      "XEDGECFG": 0,
+      "XEDGEDIST": 0,
+      "YEDGECFG": 0,
+      "YEDGEDIST": 0
+    },
+    "T42": {
+      "CTRL": 3,
+      "MAXAPPRAREA": 0,
+      "MAXTCHAREA": 0,
+      "SUPSTRENGTH": 0,
+      "SUPEXTTO": 5,
+      "MAXNUMTCHS": 0,
+      "SHAPESTRENGTH": 0,
+      "SUPDIST": 0,
+      "DISTHYST": 0,
+      "MAXSCRNAREA": 0,
+      "EDGESUPSTRENGTH": 51
+    },
+    "T8": {
+      "TCHAUTOCAL": 17,
+      "ATCHCALST": 0,
+      "ATCHCALSTHR": 0,
+      "ATCHFRCCALTHR": 50,
+      "ATCHFRCCALRATIO": 25
+    },
+    "T40": {
+      "CTRL": 0,
+      "XLOGRIP": 0,
+      "XHIGRIP": 0,
+      "YLOGRIP": 0,
+      "YHIGRIP": 0
+    },
+    "T72": {
+      "NLGAINDUALX": 5,
+      "MINNLTHR": 22,
+      "INCNLTHR": 22,
+      "FALLNLTHR": 5,
+      "NLTHRMARGIN": 5,
+      "MINTHRADJ": 24,
+      "NLTHRLIMIT": 130,
+      "NLGAINSINGX": 9,
+      "STABCTRL": 7,
+      "STABHIGHNLTHR": 12,
+      "NOISCTRL": 1,
+      "NOISLOWNLTHR": 3,
+      "NOISHIGHNLTHR": 32,
+      "VNOICTRL": 1,
+      "VNOILOWNLTHR": 4
+    }
+  }
+}

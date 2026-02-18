@@ -36,6 +36,7 @@ _LOCK_POST = (
 T8_BASE_ADDR = 1007   # GEN_ACQUISITIONCONFIG
 T40_BASE_ADDR = 1058  # PROCI_GRIPSUPPRESSION
 T42_BASE_ADDR = 1065  # PROCI_TOUCHSUPPRESSION
+T72_BASE_ADDR = 1503  # PROCG_NOISESUPPRESSION
 T100_BASE_ADDR = 1619 # TOUCH_MULTITOUCHSCREEN
 
 
@@ -145,6 +146,39 @@ REGISTERS = {
 			description="Y low grip suppression boundary."),
 		"YHIGRIP": RegisterDef("YHIGRIP", offset=4, size=1, default=0, base_addr=T40_BASE_ADDR,
 			description="Y high grip suppression boundary."),
+	},
+
+	"T72": {
+		"NLGAINDUALX": RegisterDef("NLGAINDUALX", offset=9, size=1, default=5, base_addr=T72_BASE_ADDR,
+			description="Noise level gain for dual-X measurement. Higher = more sensitive to noise."),
+		"MINNLTHR": RegisterDef("MINNLTHR", offset=10, size=1, default=22, base_addr=T72_BASE_ADDR,
+			description="Minimum noise level threshold. Noise above this triggers frequency hopping."),
+		"INCNLTHR": RegisterDef("INCNLTHR", offset=11, size=1, default=22, base_addr=T72_BASE_ADDR,
+			description="Incremental noise level threshold. Delta noise level to advance noise state."),
+		"FALLNLTHR": RegisterDef("FALLNLTHR", offset=12, size=1, default=5, base_addr=T72_BASE_ADDR,
+			description="Fall noise level threshold. Delta noise level to return to calmer state."),
+		"NLTHRMARGIN": RegisterDef("NLTHRMARGIN", offset=13, size=1, default=5, base_addr=T72_BASE_ADDR,
+			description="Noise level threshold margin added to TCHTHR in noisy conditions."),
+		"MINTHRADJ": RegisterDef("MINTHRADJ", offset=14, size=1, default=24, base_addr=T72_BASE_ADDR,
+			description="Minimum threshold adjustment. Applied to TCHTHR when noise detected."),
+		"NLTHRLIMIT": RegisterDef("NLTHRLIMIT", offset=15, size=1, default=130, base_addr=T72_BASE_ADDR,
+			description="Noise level threshold limit. Max TCHTHR increase from noise compensation."),
+		"NLGAINSINGX": RegisterDef("NLGAINSINGX", offset=17, size=1, default=9, base_addr=T72_BASE_ADDR,
+			description="Noise level gain for single-X measurement. Higher = more sensitive to noise."),
+		"STABCTRL": RegisterDef("STABCTRL", offset=20, size=1, default=7, base_addr=T72_BASE_ADDR,
+			description="Stable noise level control. Bit 0=FreqHop, 1=ApxInc, 2=NLThrInc."),
+		"STABHIGHNLTHR": RegisterDef("STABHIGHNLTHR", offset=38, size=1, default=12, base_addr=T72_BASE_ADDR,
+			description="Stable-mode high noise level threshold to transition to noisy state."),
+		"NOISCTRL": RegisterDef("NOISCTRL", offset=40, size=1, default=1, base_addr=T72_BASE_ADDR,
+			description="Noisy-mode control. Bit 0=FreqHop, 1=ApxInc, 2=NLThrInc."),
+		"NOISLOWNLTHR": RegisterDef("NOISLOWNLTHR", offset=57, size=1, default=3, base_addr=T72_BASE_ADDR,
+			description="Noisy-mode low noise level threshold to return to stable state."),
+		"NOISHIGHNLTHR": RegisterDef("NOISHIGHNLTHR", offset=58, size=1, default=32, base_addr=T72_BASE_ADDR,
+			description="Noisy-mode high noise level threshold to transition to very-noisy state."),
+		"VNOICTRL": RegisterDef("VNOICTRL", offset=60, size=1, default=1, base_addr=T72_BASE_ADDR,
+			description="Very-noisy-mode control. Bit 0=FreqHop, 1=ApxInc, 2=NLThrInc."),
+		"VNOILOWNLTHR": RegisterDef("VNOILOWNLTHR", offset=77, size=1, default=4, base_addr=T72_BASE_ADDR,
+			description="Very-noisy-mode low noise level threshold to return to noisy state."),
 	},
 }
 

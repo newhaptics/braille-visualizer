@@ -1,0 +1,52 @@
+{
+  "name": "V1.0.2",
+  "description": "Playing around with T44 touch suppression with move hysteresis at absolute minimum to increase sensitivity. Edge suppression strength is reduced to five and suppression strength is increased to 128.",
+  "tags": [],
+  "created": "2026-02-17T16:00:30",
+  "modified": "2026-02-17T16:17:48",
+  "registers": {
+    "T100": {
+      "TCHTHR": 30,
+      "TCHHYST": 8,
+      "INTTHR": 10,
+      "INTTHRHYST": 2,
+      "TCHDIDOWN": 2,
+      "TCHDIUP": 1,
+      "NEXTTCHDI": 1,
+      "MOVHYSTI": 1,
+      "MOVHYSTN": 1,
+      "AMPLHYST": 7,
+      "XEDGECFG": 0,
+      "XEDGEDIST": 0,
+      "YEDGECFG": 0,
+      "YEDGEDIST": 0
+    },
+    "T42": {
+      "CTRL": 3,
+      "MAXAPPRAREA": 0,
+      "MAXTCHAREA": 0,
+      "SUPSTRENGTH": 128,
+      "SUPEXTTO": 5,
+      "MAXNUMTCHS": 0,
+      "SHAPESTRENGTH": 0,
+      "SUPDIST": 0,
+      "DISTHYST": 0,
+      "MAXSCRNAREA": 0,
+      "EDGESUPSTRENGTH": 0
+    },
+    "T8": {
+      "TCHAUTOCAL": 17,
+      "ATCHCALST": 0,
+      "ATCHCALSTHR": 0,
+      "ATCHFRCCALTHR": 50,
+      "ATCHFRCCALRATIO": 25
+    },
+    "T40": {
+      "CTRL": 0,
+      "XLOGRIP": 0,
+      "XHIGRIP": 0,
+      "YLOGRIP": 0,
+      "YHIGRIP": 0
+    }
+  }
+}

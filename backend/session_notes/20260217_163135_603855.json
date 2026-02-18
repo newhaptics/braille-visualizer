@@ -1,0 +1,52 @@
+{
+  "id": "20260217_163135_603855",
+  "timestamp": "2026-02-17T16:31:35.603855",
+  "observation": "Phantom touches unrelated to edge phantoms.",
+  "tags": [],
+  "profile_name": "V1.0.2",
+  "register_snapshot": {
+    "T100": {
+      "TCHTHR": 30,
+      "TCHHYST": 8,
+      "INTTHR": 10,
+      "INTTHRHYST": 2,
+      "TCHDIDOWN": 2,
+      "TCHDIUP": 1,
+      "NEXTTCHDI": 1,
+      "MOVHYSTI": 1,
+      "MOVHYSTN": 1,
+      "AMPLHYST": 7,
+      "XEDGECFG": 0,
+      "XEDGEDIST": 0,
+      "YEDGECFG": 0,
+      "YEDGEDIST": 0
+    },
+    "T42": {
+      "CTRL": 3,
+      "MAXAPPRAREA": 0,
+      "MAXTCHAREA": 0,
+      "SUPSTRENGTH": 128,
+      "SUPEXTTO": 5,
+      "MAXNUMTCHS": 0,
+      "SHAPESTRENGTH": 0,
+      "SUPDIST": 0,
+      "DISTHYST": 0,
+      "MAXSCRNAREA": 0,
+      "EDGESUPSTRENGTH": 127
+    },
+    "T8": {
+      "TCHAUTOCAL": 17,
+      "ATCHCALST": 0,
+      "ATCHCALSTHR": 0,
+      "ATCHFRCCALTHR": 50,
+      "ATCHFRCCALRATIO": 25
+    },
+    "T40": {
+      "CTRL": 0,
+      "XLOGRIP": 0,
+      "XHIGRIP": 0,
+      "YLOGRIP": 0,
+      "YHIGRIP": 0
+    }
+  }
+}

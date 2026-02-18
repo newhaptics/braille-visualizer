@@ -3,8 +3,10 @@ import os
 import sys
 import uvicorn
 import asyncio
+import json
 from contextlib import asynccontextmanager
 from queue import Queue, Empty
+from datetime import datetime
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
@@ -499,6 +501,165 @@ async def apply_profile(filename: str):
         return {"status": "applied", "name": profile.name, "registers": results}
     except Exception as e:
         return {"error": str(e)}
+
+
+# ============================================================================
+# SESSION NOTES ENDPOINTS
+# ============================================================================
+def get_notes_dir() -> str:
+	"""Return the session notes directory path, creating it if needed."""
+	d = os.path.join(os.path.dirname(os.path.abspath(__file__)), "session_notes")
+	os.makedirs(d, exist_ok=True)
+	return d
+
+class NoteCreateRequest(BaseModel):
+	observation: str
+	tags: str = ""  # comma-separated string
+	profile_name: str = ""
+	include_snapshot: bool = False
+
+@app.get("/api/notes")
+async def get_notes():
+	"""List all session notes in chronological order (newest first)."""
+	notes_dir = get_notes_dir()
+	notes = []
+	try:
+		for fname in os.listdir(notes_dir):
+			if not fname.endswith(".json"):
+				continue
+			with open(os.path.join(notes_dir, fname)) as f:
+				note = json.load(f)
+			notes.append(note)
+	except Exception as e:
+		return {"error": str(e), "notes": []}
+	# Sort by timestamp descending (newest first)
+	notes.sort(key=lambda n: n.get("timestamp", ""), reverse=True)
+	return {"notes": notes}
+
+@app.get("/api/notes/{note_id}")
+async def get_note(note_id: str):
+	"""Get a single note by ID."""
+	notes_dir = get_notes_dir()
+	path = os.path.join(notes_dir, f"{note_id}.json")
+	if not os.path.exists(path):
+		return {"error": "Note not found"}
+	try:
+		with open(path) as f:
+			note = json.load(f)
+		return {"note": note}
+	except Exception as e:
+		return {"error": str(e)}
+
+@app.post("/api/notes")
+async def create_note(req: NoteCreateRequest):
+	"""Create a new session note."""
+	notes_dir = get_notes_dir()
+	note_id = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+
+	# Parse tags from comma-separated string
+	tags_list = [tag.strip() for tag in req.tags.split(",") if tag.strip()]
+
+	# Build note object
+	note = {
+		"id": note_id,
+		"timestamp": datetime.now().isoformat(),
+		"observation": req.observation,
+		"tags": tags_list,
+		"profile_name": req.profile_name,
+	}
+
+	# Add register snapshot if requested
+	if req.include_snapshot and i2c.connected:
+		try:
+			registers = await i2c.read_all()
+			note["register_snapshot"] = registers
+		except Exception as e:
+			note["snapshot_error"] = str(e)
+
+	# Save to file
+	path = os.path.join(notes_dir, f"{note_id}.json")
+	try:
+		with open(path, "w") as f:
+			json.dump(note, f, indent=2)
+		return {"status": "created", "note": note}
+	except Exception as e:
+		return {"error": str(e)}
+
+@app.delete("/api/notes/{note_id}")
+async def delete_note(note_id: str):
+	"""Delete a session note."""
+	notes_dir = get_notes_dir()
+	path = os.path.join(notes_dir, f"{note_id}.json")
+	if not os.path.exists(path):
+		return {"error": "Note not found"}
+	try:
+		os.remove(path)
+		return {"status": "deleted"}
+	except Exception as e:
+		return {"error": str(e)}
+
+@app.get("/api/notes/export/markdown")
+async def export_notes_markdown():
+	"""Export all session notes as markdown."""
+	notes_dir = get_notes_dir()
+	notes = []
+	try:
+		for fname in os.listdir(notes_dir):
+			if not fname.endswith(".json"):
+				continue
+			with open(os.path.join(notes_dir, fname)) as f:
+				note = json.load(f)
+			notes.append(note)
+	except Exception as e:
+		return {"error": str(e)}
+
+	# Sort chronologically (oldest first for report)
+	notes.sort(key=lambda n: n.get("timestamp", ""))
+
+	# Build markdown
+	lines = [
+		"# Touch Tuning Session Notes",
+		"",
+		f"**Exported:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+		f"**Total notes:** {len(notes)}",
+		"",
+		"---",
+		"",
+	]
+
+	for i, note in enumerate(notes, 1):
+		timestamp = note.get("timestamp", "Unknown time")
+		try:
+			dt = datetime.fromisoformat(timestamp)
+			time_str = dt.strftime("%Y-%m-%d %H:%M:%S")
+		except:
+			time_str = timestamp
+
+		lines.append(f"## Note {i} — {time_str}")
+
+		if note.get("profile_name"):
+			lines.append(f"**Profile:** {note['profile_name']}")
+
+		if note.get("tags"):
+			tags_str = ", ".join(note["tags"])
+			lines.append(f"**Tags:** {tags_str}")
+
+		lines.append("")
+		lines.append(note.get("observation", ""))
+
+		if note.get("register_snapshot"):
+			lines.append("")
+			lines.append("**Register Snapshot:**")
+			lines.append("```json")
+			lines.append(json.dumps(note["register_snapshot"], indent=2))
+			lines.append("```")
+
+		lines.append("")
+		lines.append("---")
+		lines.append("")
+
+	markdown = "\n".join(lines)
+	return {"markdown": markdown}
 
 
 # ============================================================================

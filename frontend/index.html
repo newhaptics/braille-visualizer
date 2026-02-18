@@ -170,6 +170,32 @@
     }
     .modal textarea { min-height: 60px; resize: vertical; }
     .modal .modal-btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+
+    /* ── Session Notes ── */
+    .notes-count {
+      background: #4dabf7; color: #fff; font-size: 10px; font-weight: bold;
+      border-radius: 10px; padding: 1px 6px; margin-left: 4px;
+    }
+    #notes-list { max-height: 300px; overflow-y: auto; }
+    .note-item {
+      background: #333; border: 1px solid #555; border-radius: 4px;
+      padding: 8px; margin-bottom: 6px; cursor: pointer;
+    }
+    .note-item:hover { background: #3a3a3a; }
+    .note-item.expanded { background: #3a3a3a; }
+    .note-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px; }
+    .note-time { font-size: 10px; color: #888; font-family: monospace; }
+    .note-delete {
+      background: #a33; border: none; color: #fff; border-radius: 3px;
+      padding: 2px 6px; font-size: 10px; cursor: pointer; margin-left: 6px;
+    }
+    .note-delete:hover { background: #c44; }
+    .note-preview { font-size: 11px; color: #aaa; line-height: 1.3; }
+    .note-full { font-size: 11px; color: #ddd; line-height: 1.4; white-space: pre-wrap; margin-top: 6px; }
+    .note-tags { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
+    .note-tag { font-size: 9px; background: #555; border-radius: 8px; padding: 1px 6px; color: #aaa; }
+    .note-profile { font-size: 10px; color: #4dabf7; margin-top: 4px; }
+    .note-snapshot { font-size: 10px; color: #888; margin-top: 4px; cursor: help; }
   </style>
 </head>
 <body>
@@ -218,6 +244,7 @@
           <button class="btn" onclick="readAllRegisters()">Read All</button>
           <button class="btn" onclick="writeAllRegisters()">Write All</button>
           <button class="btn danger" onclick="restoreDefaults()">Restore Defaults</button>
+          <button class="btn" onclick="exportNotesMarkdown()">Export Notes</button>
           <span class="flash" id="action-flash"></span>
         </div>
       </div>
@@ -240,6 +267,15 @@
           <span>0</span>
           <div id="amp-gradient"></div>
           <span>100+</span>
+        </div>
+      </div>
+
+      <!-- Session Notes -->
+      <div class="panel-section collapsible" id="notes-section">
+        <h3 onclick="toggleSection(this)">Session Notes <span id="notes-count" class="notes-count">0</span></h3>
+        <div class="section-body">
+          <button class="btn primary" onclick="showAddNoteModal()" style="width:100%; margin-bottom:8px">+ Add Note</button>
+          <div id="notes-list"></div>
         </div>
       </div>
     </div>
@@ -269,6 +305,11 @@
         <h3 onclick="toggleSection(this)">T40 — Grip Suppression</h3>
         <div class="section-body" id="t40-body"></div>
       </div>
+
+      <div class="panel-section collapsible collapsed" id="t72-section">
+        <h3 onclick="toggleSection(this)">T72 — Noise Suppression</h3>
+        <div class="section-body" id="t72-body"></div>
+      </div>
     </div>
   </div>
 
@@ -289,10 +330,31 @@
     </div>
   </div>
 
+  <!-- Add Note Modal -->
+  <div class="modal-overlay" id="add-note-modal">
+    <div class="modal">
+      <h3>Add Session Note</h3>
+      <label for="note-observation">Observation *</label>
+      <textarea id="note-observation" placeholder="Describe what you observed..." rows="6" style="min-height:120px"></textarea>
+      <label for="note-tags">Tags (comma-separated)</label>
+      <input type="text" id="note-tags" placeholder="phantom, edge, improvement" />
+      <label for="note-profile">Profile (auto-filled)</label>
+      <input type="text" id="note-profile" readonly style="background:#3a3a3a; color:#aaa" />
+      <label style="display:flex; align-items:center; gap:6px; margin-top:12px; cursor:pointer">
+        <input type="checkbox" id="note-snapshot" checked style="margin:0" />
+        <span style="font-size:12px">Include register snapshot</span>
+      </label>
+      <div class="modal-btns">
+        <button class="btn" onclick="closeAddNoteModal()">Cancel</button>
+        <button class="btn primary" onclick="doAddNote()">Save Note</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     // ── Register metadata — fetched from backend on load ──
     let REG_INFO = {};  // { "T100": { "TCHTHR": { min, max, default, description }, ... }, ... }
-    const OBJ_ORDER = ["T100", "T42", "T8", "T40"];
+    const OBJ_ORDER = ["T100", "T42", "T8", "T40", "T72"];
 
     // T42 CTRL bit definitions
     const T42_CTRL_BITS = [
@@ -406,6 +468,8 @@
 
     window.addEventListener("DOMContentLoaded", async () => {
       await buildRegisterControls();
+      loadProfiles();
+      loadNotes();
       const saved = localStorage.getItem(SSH_STORAGE_KEY);
       if (saved) {
         document.getElementById("ssh-host").value = saved;
@@ -877,9 +941,192 @@
       setSomButtonsDisabled(false);
     }
 
-    // Close modal on Escape
+    // ── SESSION NOTES ──────────────────────────────────────────────────
+    let currentNotes = [];
+
+    async function loadNotes() {
+      try {
+        const res = await fetch(API_BASE + "/api/notes");
+        const data = await res.json();
+        currentNotes = data.notes || [];
+        renderNotes();
+      } catch (e) {
+        console.error("Failed to load notes:", e);
+      }
+    }
+
+    function renderNotes() {
+      const list = document.getElementById("notes-list");
+      const count = document.getElementById("notes-count");
+      count.textContent = currentNotes.length;
+
+      if (currentNotes.length === 0) {
+        list.innerHTML = '<div style="font-size:11px; color:#666; padding:4px">No notes yet</div>';
+        return;
+      }
+
+      list.innerHTML = currentNotes.map(note => {
+        const timestamp = note.timestamp ? new Date(note.timestamp).toLocaleString() : "Unknown time";
+        const preview = note.observation.slice(0, 80) + (note.observation.length > 80 ? "..." : "");
+        const tags = (note.tags || []).map(tag => `<span class="note-tag">${tag}</span>`).join("");
+        const hasSnapshot = note.register_snapshot ? '<span class="note-snapshot" title="Has register snapshot">📋</span>' : '';
+
+        return `
+          <div class="note-item" data-note-id="${note.id}">
+            <div class="note-header">
+              <span class="note-time">${timestamp}</span>
+              <button class="note-delete" onclick="deleteNote('${note.id}', event)">×</button>
+            </div>
+            <div class="note-preview">${preview}</div>
+            ${tags ? `<div class="note-tags">${tags}</div>` : ''}
+            ${note.profile_name ? `<div class="note-profile">Profile: ${note.profile_name}</div>` : ''}
+            ${hasSnapshot}
+          </div>
+        `;
+      }).join("");
+
+      // Add click handlers to expand notes
+      list.querySelectorAll(".note-item").forEach(item => {
+        item.addEventListener("click", (e) => {
+          if (e.target.classList.contains("note-delete")) return;
+          const noteId = item.dataset.noteId;
+          const note = currentNotes.find(n => n.id === noteId);
+          if (!note) return;
+
+          if (item.classList.contains("expanded")) {
+            // Collapse
+            item.classList.remove("expanded");
+            const fullDiv = item.querySelector(".note-full");
+            if (fullDiv) fullDiv.remove();
+          } else {
+            // Expand
+            item.classList.add("expanded");
+            const fullDiv = document.createElement("div");
+            fullDiv.className = "note-full";
+            fullDiv.textContent = note.observation;
+            item.appendChild(fullDiv);
+
+            // Show snapshot if present
+            if (note.register_snapshot) {
+              const snapshotDiv = document.createElement("div");
+              snapshotDiv.style.fontSize = "9px";
+              snapshotDiv.style.color = "#666";
+              snapshotDiv.style.marginTop = "6px";
+              snapshotDiv.style.maxHeight = "150px";
+              snapshotDiv.style.overflow = "auto";
+              snapshotDiv.innerHTML = `<pre>${JSON.stringify(note.register_snapshot, null, 2)}</pre>`;
+              item.appendChild(snapshotDiv);
+            }
+          }
+        });
+      });
+    }
+
+    function showAddNoteModal() {
+      const modal = document.getElementById("add-note-modal");
+      const profileInput = document.getElementById("note-profile");
+
+      // Auto-fill current profile name
+      const profileSelect = document.getElementById("profile-select");
+      const selectedOption = profileSelect.options[profileSelect.selectedIndex];
+      profileInput.value = selectedOption ? selectedOption.text : "(No profile selected)";
+
+      // Clear previous inputs
+      document.getElementById("note-observation").value = "";
+      document.getElementById("note-tags").value = "";
+      document.getElementById("note-snapshot").checked = true;
+
+      modal.classList.add("show");
+    }
+
+    function closeAddNoteModal() {
+      document.getElementById("add-note-modal").classList.remove("show");
+    }
+
+    async function doAddNote() {
+      const observation = document.getElementById("note-observation").value.trim();
+      if (!observation) {
+        alert("Please enter an observation");
+        return;
+      }
+
+      const tags = document.getElementById("note-tags").value;
+      const profileName = document.getElementById("note-profile").value;
+      const includeSnapshot = document.getElementById("note-snapshot").checked;
+
+      try {
+        const res = await fetch(API_BASE + "/api/notes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            observation,
+            tags,
+            profile_name: profileName,
+            include_snapshot: includeSnapshot
+          })
+        });
+        const data = await res.json();
+
+        if (data.error) {
+          alert("Error: " + data.error);
+          return;
+        }
+
+        closeAddNoteModal();
+        await loadNotes();
+      } catch (e) {
+        alert("Failed to save note: " + e.message);
+      }
+    }
+
+    async function deleteNote(noteId, event) {
+      event.stopPropagation();
+      if (!confirm("Delete this note?")) return;
+
+      try {
+        const res = await fetch(API_BASE + `/api/notes/${noteId}`, { method: "DELETE" });
+        const data = await res.json();
+
+        if (data.error) {
+          alert("Error: " + data.error);
+          return;
+        }
+
+        await loadNotes();
+      } catch (e) {
+        alert("Failed to delete note: " + e.message);
+      }
+    }
+
+    async function exportNotesMarkdown() {
+      try {
+        const res = await fetch(API_BASE + "/api/notes/export/markdown");
+        const data = await res.json();
+
+        if (data.error) {
+          alert("Error: " + data.error);
+          return;
+        }
+
+        // Download markdown file
+        const blob = new Blob([data.markdown], { type: "text/markdown" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `touch_session_notes_${new Date().toISOString().replace(/[:.]/g, '-')}.md`;
+        a.click();
+        URL.revokeObjectURL(url);
+      } catch (e) {
+        alert("Failed to export notes: " + e.message);
+      }
+    }
+
+    // Close modals on Escape
     document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") closeSaveAsModal();
+      if (e.key === "Escape") {
+        closeSaveAsModal();
+        closeAddNoteModal();
+      }
     });
   </script>
 </body>
