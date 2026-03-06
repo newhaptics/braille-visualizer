@@ -185,7 +185,7 @@ h1 {
   <div class="badges">
     <div id="badge-server" class="badge disconnected">
       <span class="indicator"></span>
-      <span>Server: Disconnected</span>
+      <span>Web Server: Disconnected</span>
     </div>
     <div id="badge-device" class="badge disconnected" style="display:none;">
       <span class="indicator"></span>
@@ -204,7 +204,10 @@ h1 {
   </svg>
 </div>
 
-<div class="section-label">Event Log</div>
+<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+  <div class="section-label" style="margin-bottom:0;">Event Log <span id="log-count" style="font-weight:400; text-transform:none; letter-spacing:0;">(0 / 100)</span></div>
+  <button class="btn" id="btn-clear-log" style="display:none;" onclick="clearLog()">Clear</button>
+</div>
 <div id="log-card">
   <div id="log-empty">No events yet &mdash; connect a Codex device to begin</div>
 </div>
@@ -430,6 +433,17 @@ function addLog(type, detail) {
     card.lastElementChild.remove();
     logCount--;
   }
+
+  document.getElementById("log-count").textContent = "(" + logCount + " / " + MAX_LOG + ")";
+  document.getElementById("btn-clear-log").style.display = "";
+}
+
+function clearLog() {
+  const card = document.getElementById("log-card");
+  card.innerHTML = '<div id="log-empty">No events yet &mdash; connect a Codex device to begin</div>';
+  logCount = 0;
+  document.getElementById("log-count").textContent = "(0 / " + MAX_LOG + ")";
+  document.getElementById("btn-clear-log").style.display = "none";
 }
 
 function formatType(type) {
@@ -452,10 +466,10 @@ function setServerStatus(status) {
   el.className = "badge " + status;
 
   const labels = {
-    connected: "Server: Connected",
-    connecting: "Server: Connecting...",
-    disconnected: "Server: Disconnected",
-    error: "Server: Error",
+    connected: "Web Server: Connected",
+    connecting: "Web Server: Connecting...",
+    disconnected: "Web Server: Disconnected",
+    error: "Web Server: Error",
   };
   el.querySelector("span:last-child").textContent = labels[status] || status;
 
