@@ -1,1 +1,0 @@
-const WS_HOST = "ws://localhost:8000/ws"; // switch to cloud-based backend deployment
