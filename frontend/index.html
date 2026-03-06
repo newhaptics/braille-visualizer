@@ -22,6 +22,26 @@
   --teal: #14b8a6;
   --dot-raised: #e4e4e7;
   --dot-empty: #2a2d37;
+  --badge-green-bg: #052e16;
+  --badge-yellow-bg: #422006;
+  --badge-gray-bg: #1c1917;
+  --badge-red-bg: #450a0a;
+  --log-divider: rgba(42, 45, 55, 0.5);
+}
+
+html.light {
+  --bg: #f4f4f5;
+  --card: #ffffff;
+  --border: #e4e4e7;
+  --text: #18181b;
+  --muted: #71717a;
+  --dot-raised: #18181b;
+  --dot-empty: #d4d4d8;
+  --badge-green-bg: #dcfce7;
+  --badge-yellow-bg: #fef9c3;
+  --badge-gray-bg: #f4f4f5;
+  --badge-red-bg: #fee2e2;
+  --log-divider: rgba(228, 228, 231, 0.7);
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -72,13 +92,13 @@ h1 {
   flex-shrink: 0;
 }
 
-.badge.connected      { background: #052e16; color: var(--green); }
+.badge.connected      { background: var(--badge-green-bg); color: var(--green); }
 .badge.connected .indicator { background: var(--green); }
-.badge.connecting     { background: #422006; color: var(--yellow); }
+.badge.connecting     { background: var(--badge-yellow-bg); color: var(--yellow); }
 .badge.connecting .indicator { background: var(--yellow); animation: pulse 1s infinite; }
-.badge.disconnected   { background: #1c1917; color: var(--muted); }
+.badge.disconnected   { background: var(--badge-gray-bg); color: var(--muted); }
 .badge.disconnected .indicator { background: var(--muted); }
-.badge.error          { background: #450a0a; color: var(--red); }
+.badge.error          { background: var(--badge-red-bg); color: var(--red); }
 .badge.error .indicator { background: var(--red); }
 
 @keyframes pulse {
@@ -144,7 +164,7 @@ h1 {
   padding: 5px 14px;
   font-size: 12px;
   font-family: 'SF Mono', 'Menlo', 'Cascadia Code', 'Consolas', monospace;
-  border-bottom: 1px solid rgba(42, 45, 55, 0.5);
+  border-bottom: 1px solid var(--log-divider);
 }
 .log-entry:last-child { border-bottom: none; }
 
@@ -192,6 +212,7 @@ h1 {
       <span>Codex: Waiting...</span>
     </div>
     <button class="btn" id="btn-reconnect" style="display:none;" onclick="reconnect()">Reconnect</button>
+    <button class="btn" id="btn-theme" onclick="toggleTheme()" title="Toggle light/dark mode">Light</button>
   </div>
 </header>
 
@@ -231,6 +252,17 @@ const FINGER_COLORS = [
 
 const NS = "http://www.w3.org/2000/svg";
 
+// Theme colors resolved at runtime so SVG elements stay in sync
+function themeColors() {
+  const style = getComputedStyle(document.documentElement);
+  return {
+    card:       style.getPropertyValue("--card").trim(),
+    border:     style.getPropertyValue("--border").trim(),
+    dotRaised:  style.getPropertyValue("--dot-raised").trim(),
+    dotEmpty:   style.getPropertyValue("--dot-empty").trim(),
+  };
+}
+
 // ============================================================================
 // STATE
 // ============================================================================
@@ -257,13 +289,14 @@ function initDisplay() {
       const g = document.createElementNS(NS, "g");
 
       // Cell border
+      const tc = themeColors();
       const rect = document.createElementNS(NS, "rect");
       rect.setAttribute("x", cx0 + 1);
       rect.setAttribute("y", cy0 + 1);
       rect.setAttribute("width", CELL_W - 2);
       rect.setAttribute("height", CELL_H - 2);
       rect.setAttribute("fill", "transparent");
-      rect.setAttribute("stroke", "#2a2d37");
+      rect.setAttribute("stroke", tc.dotEmpty);
       rect.setAttribute("stroke-width", "0.5");
       rect.setAttribute("opacity", "0.3");
       rect.setAttribute("rx", "2");
@@ -278,7 +311,7 @@ function initDisplay() {
         circle.setAttribute("cy", pos.cy);
         circle.setAttribute("r", DOT_R);
         circle.setAttribute("fill", "transparent");
-        circle.setAttribute("stroke", "#2a2d37");
+        circle.setAttribute("stroke", tc.dotEmpty);
         circle.setAttribute("stroke-width", "1");
         circle.setAttribute("opacity", "0.3");
         g.appendChild(circle);
@@ -308,6 +341,7 @@ function dotPosition(dotIdx, cellX, cellY) {
 // DISPLAY UPDATE
 // ============================================================================
 function updateDisplay(brailleStr) {
+  const tc = themeColors();
   const lines = brailleStr.split("\n");
   for (let r = 0; r < ROWS; r++) {
     const line = lines[r] || "";
@@ -320,13 +354,13 @@ function updateDisplay(brailleStr) {
         const raised = !!(code & (1 << d));
         const el = dots[d];
         if (raised) {
-          el.setAttribute("fill", "#e4e4e7");
-          el.setAttribute("stroke", "#e4e4e7");
+          el.setAttribute("fill", tc.dotRaised);
+          el.setAttribute("stroke", tc.dotRaised);
           el.setAttribute("stroke-width", "0");
           el.setAttribute("opacity", "1");
         } else {
           el.setAttribute("fill", "transparent");
-          el.setAttribute("stroke", "#2a2d37");
+          el.setAttribute("stroke", tc.dotEmpty);
           el.setAttribute("stroke-width", "1");
           el.setAttribute("opacity", "0.3");
         }
@@ -599,9 +633,49 @@ function handleMessage(msg) {
 }
 
 // ============================================================================
+// THEME
+// ============================================================================
+function applyTheme() {
+  const tc = themeColors();
+
+  // SVG background rect
+  document.querySelector("#display-svg > rect").setAttribute("fill", tc.card);
+
+  // Cell borders
+  document.querySelectorAll("#g-cells rect").forEach(function(r) {
+    r.setAttribute("stroke", tc.dotEmpty);
+  });
+
+  // Re-render dots with correct colors (empty dots use theme border color)
+  document.querySelectorAll("#g-cells circle").forEach(function(c) {
+    if (c.getAttribute("opacity") === "1") {
+      c.setAttribute("fill", tc.dotRaised);
+      c.setAttribute("stroke", tc.dotRaised);
+    } else {
+      c.setAttribute("stroke", tc.dotEmpty);
+    }
+  });
+
+  // Update toggle button label
+  var isLight = document.documentElement.classList.contains("light");
+  document.getElementById("btn-theme").textContent = isLight ? "Dark" : "Light";
+}
+
+function toggleTheme() {
+  document.documentElement.classList.toggle("light");
+  var isLight = document.documentElement.classList.contains("light");
+  localStorage.setItem("codex-visualizer-theme", isLight ? "light" : "dark");
+  applyTheme();
+}
+
+// ============================================================================
 // BOOT
 // ============================================================================
+if (localStorage.getItem("codex-visualizer-theme") === "light") {
+  document.documentElement.classList.add("light");
+}
 initDisplay();
+applyTheme();
 connect();
 </script>
 </body>
