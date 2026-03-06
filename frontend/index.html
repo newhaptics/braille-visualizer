@@ -350,7 +350,16 @@ function dotPosition(dotIdx, cellX, cellY) {
 // ============================================================================
 function updateDisplay(brailleStr) {
   const tc = themeColors();
-  const lines = brailleStr.split("\n");
+  // Handle both newline-separated and flat (128 char) formats
+  var lines;
+  if (brailleStr.indexOf("\n") !== -1) {
+    lines = brailleStr.split("\n");
+  } else {
+    lines = [];
+    for (var i = 0; i < ROWS; i++) {
+      lines.push(brailleStr.slice(i * COLS, (i + 1) * COLS));
+    }
+  }
   for (let r = 0; r < ROWS; r++) {
     const line = lines[r] || "";
     for (let c = 0; c < COLS; c++) {
