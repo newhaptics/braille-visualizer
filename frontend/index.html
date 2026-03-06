@@ -1,17 +1,715 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Codex Visualizer</title>
-  <script src="https://cdn.jsdelivr.net/npm/p5@1.6.0/lib/p5.min.js"></script>
-  <script src="/static/config.js"></script>
-  <script src="/static/sketch.js" defer></script>
-  <style>
-    body { margin: 0; background: #222; }
-    canvas { display: block; margin: auto; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Codex Visualizer</title>
+<style>
+:root {
+  --bg: #0f1117;
+  --card: #1a1d27;
+  --border: #2a2d37;
+  --text: #e4e4e7;
+  --muted: #71717a;
+  --green: #22c55e;
+  --yellow: #eab308;
+  --red: #ef4444;
+  --cyan: #06b6d4;
+  --blue: #3b82f6;
+  --purple: #8b5cf6;
+  --orange: #f97316;
+  --pink: #ec4899;
+  --teal: #14b8a6;
+  --dot-raised: #e4e4e7;
+  --dot-empty: #2a2d37;
+  --badge-green-bg: #052e16;
+  --badge-yellow-bg: #422006;
+  --badge-gray-bg: #1c1917;
+  --badge-red-bg: #450a0a;
+  --log-divider: rgba(42, 45, 55, 0.5);
+}
+
+html.light {
+  --bg: #f4f4f5;
+  --card: #ffffff;
+  --border: #e4e4e7;
+  --text: #18181b;
+  --muted: #71717a;
+  --dot-raised: #18181b;
+  --dot-empty: #d4d4d8;
+  --badge-green-bg: #dcfce7;
+  --badge-yellow-bg: #fef9c3;
+  --badge-gray-bg: #f4f4f5;
+  --badge-red-bg: #fee2e2;
+  --log-divider: rgba(228, 228, 231, 0.7);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  padding: 20px 24px;
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+h1 {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.badges {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.indicator {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.badge.connected      { background: var(--badge-green-bg); color: var(--green); }
+.badge.connected .indicator { background: var(--green); }
+.badge.connecting     { background: var(--badge-yellow-bg); color: var(--yellow); }
+.badge.connecting .indicator { background: var(--yellow); animation: pulse 1s infinite; }
+.badge.disconnected   { background: var(--badge-gray-bg); color: var(--muted); }
+.badge.disconnected .indicator { background: var(--muted); }
+.badge.error          { background: var(--badge-red-bg); color: var(--red); }
+.badge.error .indicator { background: var(--red); }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.btn:hover { background: var(--border); color: var(--text); }
+
+/* Display */
+#display-card {
+  background: var(--card);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+#display-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 6px;
+}
+
+/* Event Log */
+.section-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+#log-card {
+  background: var(--card);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  padding: 4px 0;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+#log-card::-webkit-scrollbar { width: 6px; }
+#log-card::-webkit-scrollbar-track { background: transparent; }
+#log-card::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+.log-entry {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 5px 14px;
+  font-size: 12px;
+  font-family: 'SF Mono', 'Menlo', 'Cascadia Code', 'Consolas', monospace;
+  border-bottom: 1px solid var(--log-divider);
+}
+.log-entry:last-child { border-bottom: none; }
+
+.log-time { color: var(--muted); flex-shrink: 0; }
+.log-type { font-weight: 600; flex-shrink: 0; min-width: 160px; }
+.log-detail { color: var(--muted); }
+
+.log-type.DoubleTap           { color: var(--cyan); }
+.log-type.Keystroke           { color: var(--green); }
+.log-type.TwoFingerDoubleTap  { color: var(--orange); }
+.log-type.TwoFingerSwipe      { color: var(--blue); }
+.log-type.ThreeFingerSwipe    { color: var(--blue); }
+.log-type.FourFingerSwipe     { color: var(--blue); }
+.log-type.FourFingerPinch     { color: var(--purple); }
+.log-type.FourFingerSpread    { color: var(--purple); }
+.log-type.EightFingerDoubleTap { color: var(--pink); }
+.log-type.EightFingerHold     { color: var(--pink); }
+.log-type.OneFingerTripleTap  { color: var(--yellow); }
+
+#log-empty {
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+  padding: 24px 14px;
+}
+
+/* Double-tap highlight animation */
+@keyframes highlight-fade {
+  0%   { opacity: 0.5; }
+  100% { opacity: 0; }
+}
+</style>
 </head>
 <body>
+
+<header>
+  <h1>Codex Visualizer</h1>
+  <div class="badges">
+    <div id="badge-server" class="badge disconnected">
+      <span class="indicator"></span>
+      <span>Web Server: Disconnected</span>
+    </div>
+    <div id="badge-device" class="badge disconnected" style="display:none;">
+      <span class="indicator"></span>
+      <span>Codex: Waiting...</span>
+    </div>
+    <button class="btn" id="btn-reconnect" style="display:none;" onclick="reconnect()">Reconnect</button>
+    <button class="btn" id="btn-theme" onclick="toggleTheme()" title="Toggle light/dark mode">Light</button>
+  </div>
+</header>
+
+<div id="display-card">
+  <svg id="display-svg" viewBox="0 0 1600 350" xmlns="http://www.w3.org/2000/svg">
+    <rect width="1600" height="350" fill="#1a1d27" rx="6"/>
+    <g id="g-cells"></g>
+    <g id="g-highlights"></g>
+    <g id="g-touches"></g>
+  </svg>
+</div>
+
+<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+  <div class="section-label" style="margin-bottom:0;">Event Log <span id="log-count" style="font-weight:400; text-transform:none; letter-spacing:0;">(0 / 100)</span></div>
+  <button class="btn" id="btn-clear-log" style="display:none;" onclick="clearLog()">Clear</button>
+</div>
+<div id="log-card">
+  <div id="log-empty">No events yet &mdash; connect a Codex device to begin</div>
+</div>
+
+<script>
+// ============================================================================
+// CONSTANTS
+// ============================================================================
+const ROWS = 4, COLS = 32;
+const CELL_W = 1600 / COLS;  // 50
+const CELL_H = 350 / ROWS;   // 87.5
+const DOT_R = 5;
+const DOT_SX = 16, DOT_SY = 16;
+const BRAILLE_BASE = 0x2800;
+const MAX_LOG = 100;
+const STALE_TOUCH_MS = 3000;
+const DEVICE_DATA_TIMEOUT_MS = 5000;
+const FINGER_COLORS = [
+  "#ef4444","#f97316","#eab308","#22c55e","#06b6d4",
+  "#3b82f6","#8b5cf6","#ec4899","#f43f5e","#14b8a6"
+];
+
+const NS = "http://www.w3.org/2000/svg";
+
+// Theme colors resolved at runtime so SVG elements stay in sync
+function themeColors() {
+  const style = getComputedStyle(document.documentElement);
+  return {
+    card:       style.getPropertyValue("--card").trim(),
+    border:     style.getPropertyValue("--border").trim(),
+    dotRaised:  style.getPropertyValue("--dot-raised").trim(),
+    dotEmpty:   style.getPropertyValue("--dot-empty").trim(),
+  };
+}
+
+// ============================================================================
+// STATE
+// ============================================================================
+let ws = null;
+let serverStatus = "disconnected";
+let deviceConnected = false;
+let backoff = 1000;
+let reconnectTimer = null;
+const dotElements = [];              // dotElements[row][col][dotIdx] = <circle>
+const touches = new Map();           // id -> {x, y, lastSeen, outerEl, innerEl}
+let logCount = 0;
+let lastDataTime = 0;
+let deviceDataTimer = null;
+
+// ============================================================================
+// SVG INIT
+// ============================================================================
+function initDisplay() {
+  const gCells = document.getElementById("g-cells");
+
+  for (let r = 0; r < ROWS; r++) {
+    dotElements[r] = [];
+    for (let c = 0; c < COLS; c++) {
+      const cx0 = c * CELL_W;
+      const cy0 = r * CELL_H;
+      const g = document.createElementNS(NS, "g");
+
+      // Cell border
+      const tc = themeColors();
+      const rect = document.createElementNS(NS, "rect");
+      rect.setAttribute("x", cx0 + 1);
+      rect.setAttribute("y", cy0 + 1);
+      rect.setAttribute("width", CELL_W - 2);
+      rect.setAttribute("height", CELL_H - 2);
+      rect.setAttribute("fill", "transparent");
+      rect.setAttribute("stroke", tc.dotEmpty);
+      rect.setAttribute("stroke-width", "0.5");
+      rect.setAttribute("opacity", "0.3");
+      rect.setAttribute("rx", "2");
+      g.appendChild(rect);
+
+      // 8 dots
+      const dots = [];
+      for (let d = 0; d < 8; d++) {
+        const pos = dotPosition(d, cx0, cy0);
+        const circle = document.createElementNS(NS, "circle");
+        circle.setAttribute("cx", pos.cx);
+        circle.setAttribute("cy", pos.cy);
+        circle.setAttribute("r", DOT_R);
+        circle.setAttribute("fill", "transparent");
+        circle.setAttribute("stroke", tc.dotEmpty);
+        circle.setAttribute("stroke-width", "1");
+        circle.setAttribute("opacity", "0.3");
+        g.appendChild(circle);
+        dots.push(circle);
+      }
+      dotElements[r][c] = dots;
+      gCells.appendChild(g);
+    }
+  }
+}
+
+function dotPosition(dotIdx, cellX, cellY) {
+  const centerX = cellX + CELL_W / 2;
+  const centerY = cellY + CELL_H / 2;
+  const isRight = (dotIdx >= 3 && dotIdx <= 5) || dotIdx === 7;
+  const colOff = isRight ? DOT_SX / 2 : -DOT_SX / 2;
+  let rowIdx;
+  if (dotIdx <= 2) rowIdx = dotIdx;
+  else if (dotIdx <= 5) rowIdx = dotIdx - 3;
+  else rowIdx = 3;
+  const totalH = 3 * DOT_SY;
+  const startY = centerY - totalH / 2;
+  return { cx: centerX + colOff, cy: startY + rowIdx * DOT_SY };
+}
+
+// ============================================================================
+// DISPLAY UPDATE
+// ============================================================================
+function updateDisplay(brailleStr) {
+  const tc = themeColors();
+  const lines = brailleStr.split("\n");
+  for (let r = 0; r < ROWS; r++) {
+    const line = lines[r] || "";
+    for (let c = 0; c < COLS; c++) {
+      let ch = c < line.length ? line[c] : "\u2800";
+      if (ch === " ") ch = "\u2800";
+      const code = ch.charCodeAt(0) - BRAILLE_BASE;
+      const dots = dotElements[r][c];
+      for (let d = 0; d < 8; d++) {
+        const raised = !!(code & (1 << d));
+        const el = dots[d];
+        if (raised) {
+          el.setAttribute("fill", tc.dotRaised);
+          el.setAttribute("stroke", tc.dotRaised);
+          el.setAttribute("stroke-width", "0");
+          el.setAttribute("opacity", "1");
+        } else {
+          el.setAttribute("fill", "transparent");
+          el.setAttribute("stroke", tc.dotEmpty);
+          el.setAttribute("stroke-width", "1");
+          el.setAttribute("opacity", "0.3");
+        }
+      }
+    }
+  }
+}
+
+// ============================================================================
+// TOUCH OVERLAY
+// ============================================================================
+function updateTouch(id, action, x, y) {
+  const gTouches = document.getElementById("g-touches");
+
+  if (action === "up") {
+    const t = touches.get(id);
+    if (t) {
+      t.outerEl.remove();
+      t.innerEl.remove();
+      touches.delete(id);
+    }
+    return;
+  }
+
+  let t = touches.get(id);
+  if (!t) {
+    const color = FINGER_COLORS[id % FINGER_COLORS.length];
+    const outer = document.createElementNS(NS, "circle");
+    outer.setAttribute("r", "18");
+    outer.setAttribute("fill", color);
+    outer.setAttribute("opacity", "0.2");
+    const inner = document.createElementNS(NS, "circle");
+    inner.setAttribute("r", "8");
+    inner.setAttribute("fill", color);
+    inner.setAttribute("opacity", "0.8");
+    gTouches.appendChild(outer);
+    gTouches.appendChild(inner);
+    t = { x: 0, y: 0, lastSeen: 0, outerEl: outer, innerEl: inner };
+    touches.set(id, t);
+  }
+
+  t.x = x; t.y = y;
+  t.lastSeen = Date.now();
+  t.outerEl.setAttribute("cx", x);
+  t.outerEl.setAttribute("cy", y);
+  t.innerEl.setAttribute("cx", x);
+  t.innerEl.setAttribute("cy", y);
+}
+
+function cleanStaleTouches() {
+  const now = Date.now();
+  for (const [id, t] of touches) {
+    if (now - t.lastSeen > STALE_TOUCH_MS) {
+      t.outerEl.remove();
+      t.innerEl.remove();
+      touches.delete(id);
+    }
+  }
+}
+
+setInterval(cleanStaleTouches, 1000);
+
+// ============================================================================
+// DOUBLE-TAP / TRIPLE-TAP HIGHLIGHT
+// ============================================================================
+function highlightCell(row, col) {
+  const gHL = document.getElementById("g-highlights");
+  const rect = document.createElementNS(NS, "rect");
+  rect.setAttribute("x", col * CELL_W);
+  rect.setAttribute("y", row * CELL_H);
+  rect.setAttribute("width", CELL_W);
+  rect.setAttribute("height", CELL_H);
+  rect.setAttribute("rx", "3");
+  rect.setAttribute("fill", "#06b6d4");
+  rect.style.animation = "highlight-fade 600ms ease-out forwards";
+  gHL.appendChild(rect);
+  setTimeout(() => rect.remove(), 650);
+}
+
+// ============================================================================
+// EVENT LOG
+// ============================================================================
+function addLog(type, detail) {
+  const card = document.getElementById("log-card");
+  const empty = document.getElementById("log-empty");
+  if (empty) empty.remove();
+
+  const entry = document.createElement("div");
+  entry.className = "log-entry";
+
+  const now = new Date();
+  const ts = now.toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" })
+    + "." + String(now.getMilliseconds()).padStart(3, "0");
+
+  entry.innerHTML =
+    '<span class="log-time">' + ts + '</span>' +
+    '<span class="log-type ' + type + '">' + formatType(type) + '</span>' +
+    '<span class="log-detail">' + escapeHtml(detail) + '</span>';
+
+  card.prepend(entry);
+  logCount++;
+
+  while (logCount > MAX_LOG) {
+    card.lastElementChild.remove();
+    logCount--;
+  }
+
+  document.getElementById("log-count").textContent = "(" + logCount + " / " + MAX_LOG + ")";
+  document.getElementById("btn-clear-log").style.display = "";
+}
+
+function clearLog() {
+  const card = document.getElementById("log-card");
+  card.innerHTML = '<div id="log-empty">No events yet &mdash; connect a Codex device to begin</div>';
+  logCount = 0;
+  document.getElementById("log-count").textContent = "(0 / " + MAX_LOG + ")";
+  document.getElementById("btn-clear-log").style.display = "none";
+}
+
+function formatType(type) {
+  return type.replace(/([a-z])([A-Z])/g, "$1 $2");
+}
+
+function escapeHtml(s) {
+  const d = document.createElement("div");
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+// ============================================================================
+// CONNECTION STATUS
+// ============================================================================
+function setServerStatus(status) {
+  serverStatus = status;
+  const el = document.getElementById("badge-server");
+  const btn = document.getElementById("btn-reconnect");
+  el.className = "badge " + status;
+
+  const labels = {
+    connected: "Web Server: Connected",
+    connecting: "Web Server: Connecting...",
+    disconnected: "Web Server: Disconnected",
+    error: "Web Server: Error",
+  };
+  el.querySelector("span:last-child").textContent = labels[status] || status;
+
+  document.getElementById("badge-device").style.display =
+    status === "connected" ? "" : "none";
+
+  btn.style.display =
+    (status === "disconnected" || status === "error") ? "" : "none";
+}
+
+function setDeviceStatus(state) {
+  // state: "connected" | "no-data" | "waiting"
+  deviceConnected = state === "connected";
+  const el = document.getElementById("badge-device");
+  if (state === "connected") {
+    el.className = "badge connected";
+    el.querySelector("span:last-child").textContent = "Codex: Connected";
+  } else if (state === "no-data") {
+    el.className = "badge connecting";  // amber
+    el.querySelector("span:last-child").textContent = "Codex: No Data";
+  } else {
+    el.className = "badge disconnected";
+    el.querySelector("span:last-child").textContent = "Codex: Waiting...";
+  }
+}
+
+function onDeviceData() {
+  lastDataTime = Date.now();
+  if (!deviceConnected) {
+    setDeviceStatus("connected");
+  }
+  // Reset the no-data timer
+  if (deviceDataTimer) clearTimeout(deviceDataTimer);
+  deviceDataTimer = setTimeout(function() {
+    if (serverStatus === "connected") {
+      setDeviceStatus("no-data");
+    }
+  }, DEVICE_DATA_TIMEOUT_MS);
+}
+
+// ============================================================================
+// WEBSOCKET
+// ============================================================================
+function connect() {
+  if (ws && (ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.OPEN)) return;
+
+  const url = "ws://" + location.host + "/ws";
+  setServerStatus("connecting");
+
+  ws = new WebSocket(url);
+
+  ws.onopen = function() {
+    setServerStatus("connected");
+    backoff = 1000;
+  };
+
+  ws.onclose = function() {
+    setServerStatus("disconnected");
+    if (deviceDataTimer) { clearTimeout(deviceDataTimer); deviceDataTimer = null; }
+    setDeviceStatus("waiting");
+    scheduleReconnect();
+  };
+
+  ws.onerror = function() {
+    setServerStatus("error");
+  };
+
+  ws.onmessage = function(e) {
+    handleMessage(JSON.parse(e.data));
+  };
+}
+
+function reconnect() {
+  if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+  if (ws) { try { ws.close(); } catch(e) {} ws = null; }
+  backoff = 1000;
+  connect();
+}
+
+function scheduleReconnect() {
+  if (reconnectTimer) return;
+  reconnectTimer = setTimeout(function() {
+    reconnectTimer = null;
+    connect();
+  }, backoff);
+  backoff = Math.min(backoff * 2, 30000);
+}
+
+// ============================================================================
+// MESSAGE DISPATCH
+// ============================================================================
+function handleMessage(msg) {
+  // Any real device signal resets the data activity timer
+  if (msg.type !== "_device_status") {
+    onDeviceData();
+  }
+
+  switch (msg.type) {
+    case "PrintDisplay":
+      updateDisplay(msg.string);
+      break;
+
+    case "Touch":
+      updateTouch(msg.id, msg.action, msg.x, msg.y);
+      break;
+
+    case "DoubleTap":
+      highlightCell(msg.position[0], msg.position[1]);
+      addLog("DoubleTap", "cell (" + msg.position[0] + ", " + msg.position[1] + ")");
+      break;
+
+    case "Keystroke":
+      addLog("Keystroke", msg.value.join(" + "));
+      break;
+
+    case "TwoFingerDoubleTap":
+      addLog("TwoFingerDoubleTap", "");
+      break;
+
+    case "TwoFingerSwipe":
+    case "ThreeFingerSwipe":
+    case "FourFingerSwipe":
+      addLog(msg.type, msg.direction);
+      break;
+
+    case "FourFingerPinch":
+      addLog("FourFingerPinch", "");
+      break;
+
+    case "FourFingerSpread":
+      addLog("FourFingerSpread", "");
+      break;
+
+    case "EightFingerDoubleTap":
+      addLog("EightFingerDoubleTap", "");
+      break;
+
+    case "EightFingerHold":
+      addLog("EightFingerHold", msg.positions.length + " fingers");
+      break;
+
+    case "OneFingerTripleTap":
+      highlightCell(msg.position[0], msg.position[1]);
+      addLog("OneFingerTripleTap", "cell (" + msg.position[0] + ", " + msg.position[1] + ")");
+      break;
+
+    case "_device_status":
+      if (msg.connected) {
+        // NexusProxy TCP is up — but wait for actual data before showing green
+        if (!deviceConnected) setDeviceStatus("no-data");
+      } else {
+        if (deviceDataTimer) { clearTimeout(deviceDataTimer); deviceDataTimer = null; }
+        setDeviceStatus("waiting");
+      }
+      break;
+  }
+}
+
+// ============================================================================
+// THEME
+// ============================================================================
+function applyTheme() {
+  const tc = themeColors();
+
+  // SVG background rect
+  document.querySelector("#display-svg > rect").setAttribute("fill", tc.card);
+
+  // Cell borders
+  document.querySelectorAll("#g-cells rect").forEach(function(r) {
+    r.setAttribute("stroke", tc.dotEmpty);
+  });
+
+  // Re-render dots with correct colors (empty dots use theme border color)
+  document.querySelectorAll("#g-cells circle").forEach(function(c) {
+    if (c.getAttribute("opacity") === "1") {
+      c.setAttribute("fill", tc.dotRaised);
+      c.setAttribute("stroke", tc.dotRaised);
+    } else {
+      c.setAttribute("stroke", tc.dotEmpty);
+    }
+  });
+
+  // Update toggle button label
+  var isLight = document.documentElement.classList.contains("light");
+  document.getElementById("btn-theme").textContent = isLight ? "Dark" : "Light";
+}
+
+function toggleTheme() {
+  document.documentElement.classList.toggle("light");
+  var isLight = document.documentElement.classList.contains("light");
+  localStorage.setItem("codex-visualizer-theme", isLight ? "light" : "dark");
+  applyTheme();
+}
+
+// ============================================================================
+// BOOT
+// ============================================================================
+if (localStorage.getItem("codex-visualizer-theme") === "light") {
+  document.documentElement.classList.add("light");
+}
+initDisplay();
+applyTheme();
+connect();
+</script>
 </body>
 </html>
