@@ -44,4 +44,3 @@ The Python relay connects to NexusProxy, decodes binary SIG frames into JSON, an
 
 Display: `PrintDisplay` | Touch: `Touch` (10-point, ~60Hz) | Taps: `DoubleTap`, `OneFingerTripleTap` | Keys: `Keystroke` | Gestures: `TwoFingerDoubleTap`, `TwoFingerSwipe`, `ThreeFingerSwipe`, `FourFingerSwipe`, `FourFingerPinch`, `FourFingerSpread`, `EightFingerDoubleTap`, `EightFingerHold`
 
-Gesture signals require the `gesture-serialization` branch of `hapticos-nexus`.
