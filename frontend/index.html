@@ -226,8 +226,13 @@ h1 {
 </div>
 
 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-  <div class="section-label" style="margin-bottom:0;">Event Log <span id="log-count" style="font-weight:400; text-transform:none; letter-spacing:0;">(0 / 100)</span></div>
-  <button class="btn" id="btn-clear-log" style="display:none;" onclick="clearLog()">Clear</button>
+  <div class="section-label" style="margin-bottom:0; cursor:pointer; user-select:none;" onclick="toggleLog()">
+    <span id="log-chevron" style="display:inline-block; transition:transform 0.2s;">&#9660;</span>
+    Event Log <span id="log-count" style="font-weight:400; text-transform:none; letter-spacing:0;">(0 / 100)</span>
+  </div>
+  <div style="display:flex; gap:6px;">
+    <button class="btn" id="btn-clear-log" style="display:none;" onclick="clearLog()">Clear</button>
+  </div>
 </div>
 <div id="log-card">
   <div id="log-empty">No events yet &mdash; connect a Codex device to begin</div>
@@ -481,6 +486,14 @@ function clearLog() {
   logCount = 0;
   document.getElementById("log-count").textContent = "(0 / " + MAX_LOG + ")";
   document.getElementById("btn-clear-log").style.display = "none";
+}
+
+let logCollapsed = false;
+
+function toggleLog() {
+  logCollapsed = !logCollapsed;
+  document.getElementById("log-card").style.display = logCollapsed ? "none" : "";
+  document.getElementById("log-chevron").style.transform = logCollapsed ? "rotate(-90deg)" : "";
 }
 
 function formatType(type) {
