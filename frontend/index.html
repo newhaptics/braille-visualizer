@@ -245,6 +245,7 @@ const DOT_SX = 16, DOT_SY = 16;
 const BRAILLE_BASE = 0x2800;
 const MAX_LOG = 100;
 const STALE_TOUCH_MS = 3000;
+const DEVICE_DATA_TIMEOUT_MS = 5000;
 const FINGER_COLORS = [
   "#ef4444","#f97316","#eab308","#22c55e","#06b6d4",
   "#3b82f6","#8b5cf6","#ec4899","#f43f5e","#14b8a6"
@@ -274,6 +275,8 @@ let reconnectTimer = null;
 const dotElements = [];              // dotElements[row][col][dotIdx] = <circle>
 const touches = new Map();           // id -> {x, y, lastSeen, outerEl, innerEl}
 let logCount = 0;
+let lastDataTime = 0;
+let deviceDataTimer = null;
 
 // ============================================================================
 // SVG INIT
@@ -514,16 +517,34 @@ function setServerStatus(status) {
     (status === "disconnected" || status === "error") ? "" : "none";
 }
 
-function setDeviceStatus(connected) {
-  deviceConnected = connected;
+function setDeviceStatus(state) {
+  // state: "connected" | "no-data" | "waiting"
+  deviceConnected = state === "connected";
   const el = document.getElementById("badge-device");
-  if (connected) {
+  if (state === "connected") {
     el.className = "badge connected";
     el.querySelector("span:last-child").textContent = "Codex: Connected";
+  } else if (state === "no-data") {
+    el.className = "badge connecting";  // amber
+    el.querySelector("span:last-child").textContent = "Codex: No Data";
   } else {
     el.className = "badge disconnected";
     el.querySelector("span:last-child").textContent = "Codex: Waiting...";
   }
+}
+
+function onDeviceData() {
+  lastDataTime = Date.now();
+  if (!deviceConnected) {
+    setDeviceStatus("connected");
+  }
+  // Reset the no-data timer
+  if (deviceDataTimer) clearTimeout(deviceDataTimer);
+  deviceDataTimer = setTimeout(function() {
+    if (serverStatus === "connected") {
+      setDeviceStatus("no-data");
+    }
+  }, DEVICE_DATA_TIMEOUT_MS);
 }
 
 // ============================================================================
@@ -544,7 +565,8 @@ function connect() {
 
   ws.onclose = function() {
     setServerStatus("disconnected");
-    setDeviceStatus(false);
+    if (deviceDataTimer) { clearTimeout(deviceDataTimer); deviceDataTimer = null; }
+    setDeviceStatus("waiting");
     scheduleReconnect();
   };
 
@@ -577,6 +599,11 @@ function scheduleReconnect() {
 // MESSAGE DISPATCH
 // ============================================================================
 function handleMessage(msg) {
+  // Any real device signal resets the data activity timer
+  if (msg.type !== "_device_status") {
+    onDeviceData();
+  }
+
   switch (msg.type) {
     case "PrintDisplay":
       updateDisplay(msg.string);
@@ -627,7 +654,13 @@ function handleMessage(msg) {
       break;
 
     case "_device_status":
-      setDeviceStatus(msg.connected);
+      if (msg.connected) {
+        // NexusProxy TCP is up — but wait for actual data before showing green
+        if (!deviceConnected) setDeviceStatus("no-data");
+      } else {
+        if (deviceDataTimer) { clearTimeout(deviceDataTimer); deviceDataTimer = null; }
+        setDeviceStatus("waiting");
+      }
       break;
   }
 }
